@@ -1,5 +1,5 @@
 // app/(tabs)/imageRec.jsx
-// updating to use the vision servise 
+
 import { useState } from "react";
 import { ActivityIndicator, Alert, Button, Image, Text, View } from "react-native";
 // Expo Image Picker for selecting from gallery (latest API)
