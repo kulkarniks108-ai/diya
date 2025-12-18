@@ -1,15 +1,17 @@
 // app/(tabs)/imageRec.jsx
 // updating to use the vision service to analyze images picked from gallery
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Button, Image, Text, View } from "react-native";
 // Expo Image Picker for selecting from gallery (latest API)
+import { Camera } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 // Axios for HTTP calls
 import axios from "axios";
 // Expo FileSystem v54+ (new File/Directory API)
 // Use legacy FileSystem to ensure readAsStringAsync works reliably across environments
 import * as FileSystem from "expo-file-system/legacy";
-import { captureAndDescribe } from "../../core/captureAndDescribe";
+import { assist } from "../../core/assist";
+import { speak } from "../../services/speech";
 
 /**
  * ImageRec screen
@@ -35,6 +37,16 @@ export default function ImageRec() {
   const [loading, setLoading] = useState(false);
   // Optional error message to show to user
   const [errorMessage, setErrorMessage] = useState("");
+  // Camera permission & ref for programmatic capture
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
+  const cameraRef = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(status === "granted");
+    })();
+  }, []);
 
   /**
    * Requests permission and opens the media library to pick an image.
@@ -155,9 +167,70 @@ export default function ImageRec() {
     }
   };
 
+  const onAssistPress = async () => {
+    try {
+      setErrorMessage("");
+      setLoading(true);
+
+      // Ensure permission
+      if (!hasCameraPermission) {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          speak("Camera permission denied");
+          setLoading(false);
+          return;
+        }
+        setHasCameraPermission(true);
+      }
+
+      // Programmatic capture via expo-camera
+      if (!cameraRef.current) {
+        speak("Camera not ready");
+        setLoading(false);
+        return;
+      }
+
+      speak("Capturing image");
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      const capturedUri = photo?.uri;
+      if (!capturedUri) {
+        speak("Capture failed");
+        setLoading(false);
+        return;
+      }
+      setImageUri(capturedUri);
+
+      // Analyze via core orchestrator
+      await assist({
+        imageUri: capturedUri,
+        prompt: "Describe the surroundings and warn about obstacles",
+        language: "en",
+      });
+    } catch (err) {
+      console.error("Assist failed:", err);
+      const apiErrorMessage = err?.message || "Error analyzing image. Please try again later.";
+      setErrorMessage(apiErrorMessage);
+      Alert.alert("Analysis Error", apiErrorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={{ padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 18, fontWeight: "600" }}>Image Recognition</Text>
+
+      {/* Small camera preview for programmatic capture */}
+      {hasCameraPermission ? (
+        <Camera
+          ref={cameraRef}
+          style={{ width: 240, height: 180, borderRadius: 8 }}
+          type={Camera.Constants.Type.back}
+          ratio="4:3"
+        />
+      ) : (
+        <Text style={{ color: "#666" }}>Camera permission not granted</Text>
+      )}
 
       {/* Preview the selected image */}
       {imageUri ? (
@@ -179,8 +252,8 @@ export default function ImageRec() {
       {/* Picker Button */}
       <Button title="Pick an image from gallery" onPress={pickImage} />
 
-      {/* Analyze Button with loading guard */}
-      <Button title={loading ? "Analyzing..." : "Analyze Image"} onPress={captureAndDescribe} disabled={loading} />
+      {/* Assist Button with loading guard */}
+      <Button title={loading ? "Analyzing..." : "Tell me about the surroundings"} onPress={onAssistPress} disabled={loading} />
 
       {/* Loading Indicator */}
       {loading && (

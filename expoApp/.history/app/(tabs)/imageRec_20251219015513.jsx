@@ -1,0 +1,285 @@
+// app/(tabs)/imageRec.jsx
+// updating to use the vision service to analyze images picked from gallery
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Button, Image, Text, View } from "react-native";
+// Expo Image Picker for selecting from gallery (latest API)
+import * as ImagePicker from "expo-image-picker";
+import { Camera } from "expo-camera";
+// Axios for HTTP calls
+import axios from "axios";
+// Expo FileSystem v54+ (new File/Directory API)
+// Use legacy FileSystem to ensure readAsStringAsync works reliably across environments
+import * as FileSystem from "expo-file-system/legacy";
+import { assist } from "../../core/assist";
+import { speak } from "../../services/speech";
+
+/**
+ * ImageRec screen
+ * - Lets user pick an image
+ * - Converts it to base64 using Expo v54 File API (not legacy)
+ * - Sends it to Google Cloud Vision API for label detection
+ * - Displays labels with confidence percentages
+ *
+ * Why these choices:
+ * - readAsStringAsync is deprecated in v54; use File API instead.
+ * - Use 'base64' encoding for Vision API compatibility.
+ * - Request media permissions before picker.
+ * - Defensive parsing and user-friendly error feedback.
+ * - Comments guide future env-key migration.
+ */
+
+export default function ImageRec() {
+  // Local image URI returned by Expo ImagePicker
+  const [imageUri, setImageUri] = useState(null);
+  // Labels returned from Google Cloud Vision API
+  const [labels, setLabels] = useState([]);
+  // Loading state for network/IO work
+  const [loading, setLoading] = useState(false);
+  // Optional error message to show to user
+  const [errorMessage, setErrorMessage] = useState("");
+  // Camera permission & ref for programmatic capture
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
+  const cameraRef = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(status === "granted");
+    })();
+  }, []);
+
+  /**
+   * Requests permission and opens the media library to pick an image.
+   */
+  const pickImage = async () => {
+    setErrorMessage("");
+
+    try {
+      // Request media library permissions first (required by ImagePicker)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "We need access to your media library to select images.");
+        return;
+      }
+
+      // Launch image picker (we'll read base64 via File API, not via picker)
+      const result = await ImagePicker.launchImageLibraryAsync({
+        // Use the new mediaTypes API: array of strings per Expo docs
+        // Valid values include 'images' and 'videos'
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      // Guard against cancel case (user closes picker)
+      if (result?.canceled) return;
+
+      // Ensure we have an asset with valid URI
+      const asset = result?.assets?.[0];
+      if (!asset?.uri) {
+        setErrorMessage("No valid image was selected.");
+        return;
+      }
+
+      setImageUri(asset.uri);
+    } catch (err) {
+      console.error("Error picking image:", err);
+      setErrorMessage("Error picking image. Please try again.");
+    }
+  };
+
+  /**
+   * Reads the selected image and sends it to Google Cloud Vision to get labels.
+   * Uses Expo v54 File API instead of deprecated legacy methods.
+   */
+  const xxxanalyzeImage = async () => {
+    setErrorMessage("");
+    setLabels([]);
+    setLoading(true);
+
+    try {
+      // Ensure an image is selected
+      if (!imageUri) {
+        Alert.alert("No image", "Please select an image first.");
+        setLoading(false);
+        return;
+      }
+
+      /**
+       * IMPORTANT: Do not hardcode API keys in source code for production apps.
+       * Safer options:
+       * - app.json/app.config.js -> `extra` -> access with `expo-constants`.
+       * - server-side proxy that holds the key.
+       * For now, keep inline for testing, but migrate before release.
+       */
+      const apiKey = "AIzaSyDdTZc5VCpej0EZu4FNDvIPHc4QsboOACQ"; // temp key for testing
+      const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
+
+      /**
+       * Expo SDK v54 File API:
+       * 1) Create a File from the picked image URI.
+       * 2) Read file contents with base64 encoding.
+       * Docs: https://docs.expo.dev/versions/v54.0.0/sdk/filesystem/
+       *
+       * Note: Dev asset URIs (e.g., content:// on Android) are supported.
+       */
+      // Read file as base64 string (without data: prefix) using legacy API
+      const base64ImageData = await FileSystem.readAsStringAsync(imageUri, { encoding: "base64" });
+
+      // Prepare request payload for LABEL_DETECTION
+      const requestData = {
+        requests: [
+          {
+            image: { content: base64ImageData },
+            features: [{ type: "LABEL_DETECTION", maxResults: 5 }],
+          },
+        ],
+      };
+
+      // Make API request
+      const apiResponse = await axios.post(apiUrl, requestData);
+
+      // Defensive parsing: ensure responses array exists
+      const responses = apiResponse?.data?.responses;
+      if (!Array.isArray(responses) || responses.length === 0) {
+        setErrorMessage("No response from Vision API.");
+        setLoading(false);
+        return;
+      }
+
+      // Extract label annotations safely
+      const annotations = responses[0]?.labelAnnotations ?? [];
+      setLabels(annotations);
+    } catch (err) {
+      // Extract a human-readable error
+      console.error("Error analyzing image:", err);
+
+      const apiErrorMessage =
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        "Error analyzing image. Please try again later.";
+
+      setErrorMessage(apiErrorMessage);
+      Alert.alert("Vision API Error", apiErrorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onAssistPress = async () => {
+    try {
+      setErrorMessage("");
+      setLoading(true);
+
+      // Ensure permission
+      if (!hasCameraPermission) {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          speak("Camera permission denied");
+          setLoading(false);
+          return;
+        }
+        setHasCameraPermission(true);
+      }
+
+      // Programmatic capture via expo-camera
+      if (!cameraRef.current) {
+        speak("Camera not ready");
+        setLoading(false);
+        return;
+      }
+
+      speak("Capturing image");
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      const capturedUri = photo?.uri;
+      if (!capturedUri) {
+        speak("Capture failed");
+        setLoading(false);
+        return;
+      }
+      setImageUri(capturedUri);
+
+      // Analyze via core orchestrator
+      await assist({
+        imageUri: capturedUri,
+        prompt: "Describe the surroundings and warn about obstacles",
+        language: "en",
+      });
+    } catch (err) {
+      console.error("Assist failed:", err);
+      const apiErrorMessage = err?.message || "Error analyzing image. Please try again later.";
+      setErrorMessage(apiErrorMessage);
+      Alert.alert("Analysis Error", apiErrorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={{ padding: 16, gap: 12 }}>
+      <Text style={{ fontSize: 18, fontWeight: "600" }}>Image Recognition</Text>
+
+      {/* Small camera preview for programmatic capture */}
+      {hasCameraPermission ? (
+        <Camera
+          ref={cameraRef}
+          style={{ width: 240, height: 180, borderRadius: 8 }}
+          type={Camera.Constants.Type.back}
+          ratio="4:3"
+        />
+      ) : (
+        <Text style={{ color: "#666" }}>Camera permission not granted</Text>
+      )}
+
+      {/* Preview the selected image */}
+      {imageUri ? (
+        <Image
+          source={{ uri: imageUri }}
+          style={{
+            width: 240,
+            height: 180,
+            borderRadius: 8,
+            borderColor: "#ddd",
+            borderWidth: 1,
+          }}
+          resizeMode="cover"
+        />
+      ) : (
+        <Text style={{ color: "#666" }}>No image selected</Text>
+      )}
+
+      {/* Picker Button */}
+      <Button title="Pick an image from gallery" onPress={pickImage} />
+
+      {/* Assist Button with loading guard */}
+      <Button title={loading ? "Analyzing..." : "Tell me about the surroundings"} onPress={onAssistPress} disabled={loading} />
+
+      {/* Loading Indicator */}
+      {loading && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <ActivityIndicator size="small" />
+          <Text>Analyzing image…</Text>
+        </View>
+      )}
+
+      {/* Error message display */}
+      {errorMessage ? <Text style={{ color: "red" }}>{errorMessage}</Text> : null}
+
+      {/* Labels list */}
+      {labels.length > 0 && (
+        <View style={{ marginTop: 8 }}>
+          <Text style={{ fontWeight: "600" }}>Labels:</Text>
+          {labels.map((label, index) => {
+            const scorePct = label?.score != null ? Math.round(label.score * 100) : null;
+            return (
+              <Text key={`${label?.description ?? "label"}-${index}`}>
+                {label?.description ?? "Unknown"}{scorePct != null ? ` - ${scorePct}%` : ""}
+              </Text>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
