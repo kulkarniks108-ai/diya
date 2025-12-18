@@ -36,22 +36,13 @@ export const useLiveStore = create<LiveState>((set) => ({
       // 🔹 get current user from authStore
       const authUser = useAuthStore.getState().user;
       if (!authUser || authUser.role !== "blind") {
-        throw new Error("Permission denied: only blind users can access live location");
+        throw new Error("Permission denied");
       }
 
-      // 🔹 ensure location services are enabled on the device
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (!servicesEnabled) {
-        throw new Error("Location services are turned off. Enable GPS and try again.");
-      }
-
-      // 🔹 check and request foreground permission
-      const currentPerm = await Location.getForegroundPermissionsAsync();
-      if (currentPerm.status !== "granted") {
-        const req = await Location.requestForegroundPermissionsAsync();
-        if (req.status !== "granted") {
-          throw new Error("Location permission denied. Please grant permission in Settings.");
-        }
+      // 🔹 ask permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        throw new Error("Location permission denied");
       }
 
       // 🔹 get location
@@ -91,20 +82,12 @@ export const useLiveStore = create<LiveState>((set) => ({
 
     const authUser = useAuthStore.getState().user;
     if (!authUser || authUser.role !== "blind") {
-      throw new Error("Permission denied: only blind users can start live tracking");
+      throw new Error("Permission denied");
     }
 
-    const servicesEnabled = await Location.hasServicesEnabledAsync();
-    if (!servicesEnabled) {
-      throw new Error("Location services are turned off. Enable GPS and try again.");
-    }
-
-    const currentPerm = await Location.getForegroundPermissionsAsync();
-    if (currentPerm.status !== "granted") {
-      const req = await Location.requestForegroundPermissionsAsync();
-      if (req.status !== "granted") {
-        throw new Error("Location permission denied. Please grant permission in Settings.");
-      }
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      throw new Error("Location permission denied");
     }
 
     
@@ -116,8 +99,8 @@ export const useLiveStore = create<LiveState>((set) => ({
     locationSubscription = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: 5000,
-        distanceInterval: 2,
+        timeInterval: 5000,       
+        distanceInterval: 2,      
       },
       async (position) => {
         const { latitude, longitude } = position.coords;

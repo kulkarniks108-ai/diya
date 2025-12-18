@@ -9,7 +9,7 @@ import axios from "axios";
 // Expo FileSystem v54+ (new File/Directory API)
 // Use legacy FileSystem to ensure readAsStringAsync works reliably across environments
 import * as FileSystem from "expo-file-system/legacy";
-import { captureAndDescribe } from "../../core/captureAndDescribe";
+
 
 /**
  * ImageRec screen
@@ -180,7 +180,7 @@ export default function ImageRec() {
       <Button title="Pick an image from gallery" onPress={pickImage} />
 
       {/* Analyze Button with loading guard */}
-      <Button title={loading ? "Analyzing..." : "Analyze Image"} onPress={captureAndDescribe} disabled={loading} />
+      <Button title={loading ? "Analyzing..." : "Analyze Image"} onPress={analyzeImage} disabled={loading} />
 
       {/* Loading Indicator */}
       {loading && (
