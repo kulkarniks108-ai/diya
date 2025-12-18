@@ -137,7 +137,6 @@ export default function ImageRec() {
           ref={cameraRef}
           style={{ width: 240, height: 180, borderRadius: 8 }}
           // type="back"
-          // type={CameraType.back}
 
           ratio="4:3"
         />

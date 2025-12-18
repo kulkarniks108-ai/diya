@@ -1,5 +1,5 @@
 // app/(tabs)/imageRec.tsx
-import { Camera, CameraView } from "expo-camera";
+import { Camera } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Button, Image, Text, View } from "react-native";
@@ -26,7 +26,7 @@ export default function ImageRec() {
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const cameraRef = useRef<CameraView  | null>(null);
+  const cameraRef = useRef<ExpoCamera | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -133,12 +133,10 @@ export default function ImageRec() {
 
       {/* Small camera preview for programmatic capture */}
       {hasCameraPermission ? (
-        <CameraView
+        <Camera
           ref={cameraRef}
           style={{ width: 240, height: 180, borderRadius: 8 }}
-          // type="back"
-          // type={CameraType.back}
-
+          type={CameraType.back}
           ratio="4:3"
         />
       ) : (
