@@ -1,6 +1,5 @@
 import { auth, db } from "@/config/firebase";
 import { AppUser, UserRole } from "@/types/auth";
-
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
