@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Button, Image, Text, View } from "react-native";
 import { assist } from "../../core/assist";
 import { speak } from "../../services/speech";
-import { useHardwareStore } from "@/store/hardware";
 
 /**
  * ImageRec screen
@@ -28,9 +27,6 @@ export default function ImageRec() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const cameraRef = useRef<CameraView | null>(null);
-  const setCaptureFn = useHardwareStore((s) => s.setCaptureFn);
-  const pendingAction = useHardwareStore((s) => s.pendingAction);
-  const clearPendingAction = useHardwareStore((s) => s.clearPendingAction);
 
   useEffect(() => {
     (async () => {
@@ -38,43 +34,6 @@ export default function ImageRec() {
       setHasCameraPermission(status === "granted");
     })();
   }, []);
-
-  const captureWithCamera = async (): Promise<string> => {
-    // Ensure permission
-    if (!hasCameraPermission) {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        throw new Error("Camera permission denied");
-      }
-      setHasCameraPermission(true);
-    }
-
-    if (!cameraRef.current) {
-      throw new Error("Camera not ready");
-    }
-
-    const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
-    const capturedUri = photo?.uri;
-    if (!capturedUri) {
-      throw new Error("Capture failed");
-    }
-    setImageUri(capturedUri);
-    return capturedUri;
-  };
-
-  useEffect(() => {
-    // Register captureFn for ESP32-triggered assist.
-    setCaptureFn(captureWithCamera);
-    return () => setCaptureFn(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasCameraPermission]);
-
-  useEffect(() => {
-    if (pendingAction?.type !== "ASSIST") return;
-    clearPendingAction();
-    void onAssistPress();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingAction]);
 
   /**
    * Requests permission and opens the media library to pick an image.
@@ -135,8 +94,22 @@ export default function ImageRec() {
         setHasCameraPermission(true);
       }
 
+      // Programmatic capture via expo-camera
+      if (!cameraRef.current) {
+        speak("Camera not ready");
+        setLoading(false);
+        return;
+      }
+
       speak("Capturing image");
-      const capturedUri = await captureWithCamera();
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      const capturedUri = photo?.uri;
+      if (!capturedUri) {
+        speak("Capture failed");
+        setLoading(false);
+        return;
+      }
+      setImageUri(capturedUri);
 
       // Analyze via core orchestrator
       await assist({

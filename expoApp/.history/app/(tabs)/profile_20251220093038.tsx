@@ -1,5 +1,5 @@
-import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 
 
 import FamilyManagementCard from '@/components/familyManagement';
@@ -13,11 +13,9 @@ export default function App() {
   return (
     <View style={styles.container}>
 
-      <Link href="../ble-debug" asChild>
-        <Pressable>
-          <Text>BLE Debug</Text>
-        </Pressable>
-      </Link>
+      <Pressable onPress={() => router.push('/ble-debug')}>
+        <Text>BLE Debug</Text>
+      </Pressable>
 
       <Pressable onPress={startLiveTracking}>
         <Text>Start Live Tracking</Text>

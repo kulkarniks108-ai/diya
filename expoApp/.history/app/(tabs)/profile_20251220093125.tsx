@@ -13,7 +13,7 @@ export default function App() {
   return (
     <View style={styles.container}>
 
-      <Link href="../ble-debug" asChild>
+      <Link href="/ble-debug" asChild>
         <Pressable>
           <Text>BLE Debug</Text>
         </Pressable>
