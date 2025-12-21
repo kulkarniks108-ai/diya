@@ -29,7 +29,9 @@ export default function BleDebugScreen() {
       <View style={{ gap: 6 }}>
         <Text>State: {connection.state}</Text>
         {connection.state === "connected" ? (
-          <Text>Device: {connection.device.name ?? "(no name)"} ({connection.device.id})</Text>
+          <Text>
+            Device: {connection.device?.name ?? "(no name)"} ({connection.device?.id ?? "(unknown id)"})
+          </Text>
         ) : null}
         {connection.state === "connecting" ? <Text>Connecting to: {connection.target}</Text> : null}
         {connection.state === "error" ? <Text>Error: {connection.message}</Text> : null}

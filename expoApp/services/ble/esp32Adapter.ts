@@ -30,6 +30,7 @@ export class Esp32Adapter {
   private state: Esp32ConnectionState = { state: "idle" };
   private eventListeners: Set<EventListener> = new Set();
   private stateListeners: Set<StateListener> = new Set();
+  private connectInFlight: Promise<void> | null = null;
 
   getState(): Esp32ConnectionState {
     return this.state;
@@ -77,6 +78,16 @@ export class Esp32Adapter {
   }
 
   async disconnect(): Promise<void> {
+    // If a connect is currently happening, wait for it to settle before tearing down.
+    // This avoids racing the underlying BLE stack.
+    if (this.connectInFlight) {
+      try {
+        await this.connectInFlight;
+      } catch {
+        // Ignore; we are disconnecting anyway.
+      }
+    }
+
     if (this.notifySub) {
       this.notifySub.remove();
       this.notifySub = null;
@@ -92,22 +103,43 @@ export class Esp32Adapter {
   }
 
   async connectToDeviceId(deviceId: string): Promise<void> {
-    await this.ensureReady();
-    this.setState({ state: "connecting", target: deviceId });
+    if (this.connectInFlight) return this.connectInFlight;
 
-    const connected = await bleManagerSingleton.connect(deviceId, true);
-    this.device = connected;
+    const run = (async () => {
+      // If we're already connected to this device, treat as success.
+      if (this.device?.id === deviceId && this.state.state === "connected") {
+        return;
+      }
 
-    const info: BleDeviceInfo = {
-      id: connected.id,
-      name: connected.name ?? connected.localName ?? null,
-      rssi: null,
-    };
+      // If we're connected to a different device, disconnect first.
+      if (this.device && this.device.id !== deviceId) {
+        await this.disconnect();
+      }
 
-    await this.setPreferredDeviceId(connected.id);
-    this.setState({ state: "connected", device: info });
+      await this.ensureReady();
+      this.setState({ state: "connecting", target: deviceId });
 
-    this.subscribeToEvents();
+      const connected = await bleManagerSingleton.connect(deviceId, true);
+      this.device = connected;
+
+      const info: BleDeviceInfo = {
+        id: connected.id,
+        name: connected.name ?? connected.localName ?? null,
+        rssi: null,
+      };
+
+      await this.setPreferredDeviceId(connected.id);
+      this.setState({ state: "connected", device: info });
+
+      this.subscribeToEvents();
+    })();
+
+    this.connectInFlight = run;
+    try {
+      await run;
+    } finally {
+      if (this.connectInFlight === run) this.connectInFlight = null;
+    }
   }
 
   async autoConnect(): Promise<void> {
@@ -185,10 +217,18 @@ export class Esp32Adapter {
       ESP32_SERVICE_UUID,
       ESP32_EVENT_CHAR_UUID,
       (valueBase64) => {
-        const bytes = base64ToBytes(valueBase64);
-        const event = parseEsp32Event(bytes);
-        if (!event) return;
-        this.emitEvent(event, bytes);
+        try {
+          const bytes = base64ToBytes(valueBase64);
+          const event = parseEsp32Event(bytes);
+          if (!event) return;
+          this.emitEvent(event, bytes);
+        } catch (e) {
+          // Defensive: never let a parsing/decoding issue crash the JS thread.
+          this.setState({
+            state: "error",
+            message: e instanceof Error ? e.message : "Failed to decode BLE notification",
+          });
+        }
       },
       (error) => {
         this.setState({ state: "error", message: error.message });
