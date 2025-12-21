@@ -1,6 +1,6 @@
 // app/(tabs)/imageRec.tsx
-import { Camera, CameraType } from "expo-camera";
-import type { Camera as ExpoCamera } from "expo-camera";
+import { useHardwareStore } from "@/store/hardware";
+import { Camera, CameraView } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Button, Image, Text, View } from "react-native";
@@ -27,7 +27,10 @@ export default function ImageRec() {
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const cameraRef = useRef<ExpoCamera | null>(null);
+  const cameraRef = useRef<CameraView | null>(null);
+  const setCaptureFn = useHardwareStore((s) => s.setCaptureFn);
+  const pendingAction = useHardwareStore((s) => s.pendingAction);
+  const clearPendingAction = useHardwareStore((s) => s.clearPendingAction);
 
   useEffect(() => {
     (async () => {
@@ -35,6 +38,43 @@ export default function ImageRec() {
       setHasCameraPermission(status === "granted");
     })();
   }, []);
+
+  const captureWithCamera = async (): Promise<string> => {
+    // Ensure permission
+    if (!hasCameraPermission) {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        throw new Error("Camera permission denied");
+      }
+      setHasCameraPermission(true);
+    }
+
+    if (!cameraRef.current) {
+      throw new Error("Camera not ready");
+    }
+
+    const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+    const capturedUri = photo?.uri;
+    if (!capturedUri) {
+      throw new Error("Capture failed");
+    }
+    setImageUri(capturedUri);
+    return capturedUri;
+  };
+
+  useEffect(() => {
+    // Register captureFn for ESP32-triggered assist.
+    setCaptureFn(captureWithCamera);
+    return () => setCaptureFn(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCameraPermission]);
+
+  useEffect(() => {
+    if (pendingAction?.type !== "ASSIST") return;
+    clearPendingAction();
+    void onAssistPress();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAction]);
 
   /**
    * Requests permission and opens the media library to pick an image.
@@ -95,22 +135,8 @@ export default function ImageRec() {
         setHasCameraPermission(true);
       }
 
-      // Programmatic capture via expo-camera
-      if (!cameraRef.current) {
-        speak("Camera not ready");
-        setLoading(false);
-        return;
-      }
-
       speak("Capturing image");
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
-      const capturedUri = photo?.uri;
-      if (!capturedUri) {
-        speak("Capture failed");
-        setLoading(false);
-        return;
-      }
-      setImageUri(capturedUri);
+      const capturedUri = await captureWithCamera();
 
       // Analyze via core orchestrator
       await assist({
@@ -118,11 +144,15 @@ export default function ImageRec() {
         prompt: "Describe the surroundings and warn about obstacles",
         language: "en",
       });
-    } catch (err) {
-      console.error("Assist failed:", err);
-      const apiErrorMessage = err?.message || "Error analyzing image. Please try again later.";
-      setErrorMessage(apiErrorMessage);
-      Alert.alert("Analysis Error", apiErrorMessage);
+    } catch (err: unknown) {
+      console.error("Error during assist:", err);
+      setErrorMessage("Error analyzing image. Please try again later.");
+      Alert.alert("Analysis Error", "Error analyzing image. Please try again later.");
+      if (err instanceof Error) {
+        const apiErrorMessage = err.message;
+        setErrorMessage(apiErrorMessage);
+        Alert.alert("Analysis Error", apiErrorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -134,10 +164,12 @@ export default function ImageRec() {
 
       {/* Small camera preview for programmatic capture */}
       {hasCameraPermission ? (
-        <Camera
+        <CameraView
           ref={cameraRef}
           style={{ width: 240, height: 180, borderRadius: 8 }}
-          type={CameraType.back}
+          // type="back"
+          // type={CameraType.back}
+
           ratio="4:3"
         />
       ) : (
