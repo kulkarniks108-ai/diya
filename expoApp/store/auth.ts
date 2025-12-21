@@ -24,8 +24,11 @@ import {
 } from "firebase/firestore";
 import { create } from "zustand";
 
+let authUnsubscribe: null | (() => void) = null;
+
 interface AuthState {
   user: AppUser | null;
+  authStatus: "checking" | "signedOut" | "signedIn";
   isLoading: boolean;
   error: string | null;
 
@@ -47,6 +50,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  authStatus: "checking",
   isLoading: false,
   error: null,
   familyMembers: [],
@@ -96,33 +100,59 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // ---------------- LOGOUT ----------------
   logout: async () => {
     await signOut(auth);
-    set({ user: null });
+    set({ user: null, authStatus: "signedOut" });
   },
 
   // ---------------- AUTH LISTENER ----------------
   listenToAuthChanges: () => {
-    onAuthStateChanged(auth, async (firebaseUser: User | null) => {
+    if (authUnsubscribe) return;
+
+    authUnsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
       if (!firebaseUser) {
-        set({ user: null });
+        set({ user: null, authStatus: "signedOut", error: null });
         return;
       }
 
-      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      // We have a Firebase session; resolve user profile (role) from Firestore.
+      // Keep authStatus="checking" until role is loaded to avoid redirect loops.
+      set({ authStatus: "checking" });
 
-      if (!userDoc.exists()) {
-        set({ error: "User profile not found" });
-        return;
+      try {
+        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+
+        if (!userDoc.exists()) {
+          set({ user: null, authStatus: "signedOut", error: "User profile not found" });
+          // Ensure the Firebase session doesn't persist without a profile.
+          await signOut(auth);
+          return;
+        }
+
+        const data = userDoc.data();
+        const role = data?.role as unknown;
+
+        if (role !== "blind" && role !== "family") {
+          set({ user: null, authStatus: "signedOut", error: "Invalid user role" });
+          await signOut(auth);
+          return;
+        }
+
+        set({
+          user: {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || "",
+            role,
+          },
+          authStatus: "signedIn",
+          error: null,
+        });
+      } catch (err: any) {
+        set({ user: null, authStatus: "signedOut", error: err?.message ?? "Failed to load user profile" });
+        try {
+          await signOut(auth);
+        } catch {
+          // ignore
+        }
       }
-
-      const data = userDoc.data();
-
-      set({
-        user: {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || "",
-          role: data.role,
-        },
-      });
     });
   },
 

@@ -1,7 +1,7 @@
-import { BleManager, type BleError, type Device, type Subscription } from "react-native-ble-plx";
-import { Platform } from "react-native";
-import type { BleDeviceInfo } from "@/types/ble";
 import { ensureBlePermissionsAndroid } from "@/services/ble/blePermissions.android";
+import type { BleDeviceInfo } from "@/types/ble";
+import { Platform } from "react-native";
+import { BleManager, type BleError, type Device, type Subscription } from "react-native-ble-plx";
 
 export interface BleScanCallbacks {
   onDevice: (device: BleDeviceInfo) => void;

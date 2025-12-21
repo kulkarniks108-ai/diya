@@ -30,7 +30,8 @@ export default function Signup() {
     // If no error after register, go to tabs
     const hasError = useAuthStore.getState().error;
     if (!hasError) {
-      router.replace('/(tabs)');
+      // Route through root: it redirects based on user.role
+      router.replace('/');
     }
   };
 

@@ -34,7 +34,7 @@ export default function Page() {
 
   return (
     <View>
-      <Text>Hi nigga your email is: {user?.email}</Text>
+      <Text>Hi, your email is: {user?.email}</Text>
       {/* // link to login page */}
       <Link href="/(auth)">
         <Text>Go to Login</Text>

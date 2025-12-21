@@ -26,7 +26,8 @@ export default function Login() {
     await login(email.trim(), password);
     const hasError = useAuthStore.getState().error;
     if (!hasError) {
-      router.replace('/(tabs)');
+      // Route through root: it redirects based on user.role
+      router.replace('/');
     }
   };
 

@@ -1,11 +1,11 @@
 import { bleManagerSingleton } from "@/services/ble/bleManager";
 import type { BleDeviceInfo } from "@/types/ble";
 import {
-    ESP32_DEVICE_NAME,
-    ESP32_EVENT_CHAR_UUID,
-    ESP32_SERVICE_UUID,
-    type Esp32Event,
-    parseEsp32Event,
+  ESP32_DEVICE_NAME,
+  ESP32_EVENT_CHAR_UUID,
+  ESP32_SERVICE_UUID,
+  type Esp32Event,
+  parseEsp32Event,
 } from "@/types/esp32";
 import { base64ToBytes } from "@/utils/bleBytes";
 import AsyncStorage from "@react-native-async-storage/async-storage";

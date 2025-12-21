@@ -6,7 +6,7 @@ import FamilyManagementCard from '@/components/familyManagement';
 import { useLiveStore } from '@/store/live';
 
 export default function App() {
-  const { getCurrentLocation, location, isTracking, error, triggerSOS, clearSOS, sosActive, startLiveTracking,
+  const { location, isTracking, error, triggerSOS, clearSOS, sosActive, startLiveTracking,
     stopLiveTracking,
   } = useLiveStore();
 
