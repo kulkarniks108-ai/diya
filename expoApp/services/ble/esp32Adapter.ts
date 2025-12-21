@@ -1,15 +1,15 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { BleError, Device, Subscription } from "react-native-ble-plx";
 import { bleManagerSingleton } from "@/services/ble/bleManager";
 import type { BleDeviceInfo } from "@/types/ble";
 import {
-  ESP32_DEVICE_NAME,
-  ESP32_EVENT_CHAR_UUID,
-  ESP32_SERVICE_UUID,
-  type Esp32Event,
-  parseEsp32Event,
+    ESP32_DEVICE_NAME,
+    ESP32_EVENT_CHAR_UUID,
+    ESP32_SERVICE_UUID,
+    type Esp32Event,
+    parseEsp32Event,
 } from "@/types/esp32";
 import { base64ToBytes } from "@/utils/bleBytes";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { BleError, Device, Subscription } from "react-native-ble-plx";
 
 const STORAGE_KEY_PREFERRED_DEVICE_ID = "ble.preferredDeviceId";
 
@@ -27,6 +27,8 @@ type StateListener = (state: Esp32ConnectionState) => void;
 export class Esp32Adapter {
   private device: Device | null = null;
   private notifySub: Subscription | null = null;
+  private notifyTransactionId: string | null = null;
+  private disconnectSub: Subscription | null = null;
   private state: Esp32ConnectionState = { state: "idle" };
   private eventListeners: Set<EventListener> = new Set();
   private stateListeners: Set<StateListener> = new Set();
@@ -88,9 +90,16 @@ export class Esp32Adapter {
       }
     }
 
-    if (this.notifySub) {
-      this.notifySub.remove();
-      this.notifySub = null;
+    // NOTE: Intentionally not calling this.notifySub.remove() here.
+    // On some Android + RN versions, react-native-ble-plx can crash the process
+    // via a NullPointerException inside its cancel/reject path.
+    // Disconnecting the device is sufficient to stop notifications.
+    this.notifySub = null;
+    this.notifyTransactionId = null;
+
+    if (this.disconnectSub) {
+      this.disconnectSub.remove();
+      this.disconnectSub = null;
     }
 
     if (this.device) {
@@ -122,6 +131,23 @@ export class Esp32Adapter {
       const connected = await bleManagerSingleton.connect(deviceId, true);
       this.device = connected;
 
+      if (this.disconnectSub) {
+        this.disconnectSub.remove();
+        this.disconnectSub = null;
+      }
+
+      // Keep internal state in sync on unexpected disconnects.
+      this.disconnectSub = connected.onDisconnected((error) => {
+        this.device = null;
+        this.notifySub = null;
+        this.notifyTransactionId = null;
+        if (error) {
+          this.setState({ state: "error", message: error.message });
+        } else {
+          this.setState({ state: "idle" });
+        }
+      });
+
       const info: BleDeviceInfo = {
         id: connected.id,
         name: connected.name ?? connected.localName ?? null,
@@ -131,7 +157,7 @@ export class Esp32Adapter {
       await this.setPreferredDeviceId(connected.id);
       this.setState({ state: "connected", device: info });
 
-      this.subscribeToEvents();
+      await this.subscribeToEvents();
     })();
 
     this.connectInFlight = run;
@@ -204,14 +230,19 @@ export class Esp32Adapter {
     });
   }
 
-  private subscribeToEvents(): void {
+  private async subscribeToEvents(): Promise<void> {
     if (!this.device) return;
 
-    if (this.notifySub) {
-      this.notifySub.remove();
-      this.notifySub = null;
+    const transactionId = `esp32_notify_${this.device.id}`;
+    if (this.notifySub && this.notifyTransactionId === transactionId) {
+      return;
     }
 
+    // Validate that the service + characteristic exist and are notifiable.
+    // This prevents immediate monitor failures (which can trigger native BLE-Plx bugs on Android).
+    await this.assertEventCharacteristicReady(this.device);
+
+    this.notifyTransactionId = transactionId;
     this.notifySub = bleManagerSingleton.monitorCharacteristicForService(
       this.device,
       ESP32_SERVICE_UUID,
@@ -223,7 +254,6 @@ export class Esp32Adapter {
           if (!event) return;
           this.emitEvent(event, bytes);
         } catch (e) {
-          // Defensive: never let a parsing/decoding issue crash the JS thread.
           this.setState({
             state: "error",
             message: e instanceof Error ? e.message : "Failed to decode BLE notification",
@@ -232,8 +262,29 @@ export class Esp32Adapter {
       },
       (error) => {
         this.setState({ state: "error", message: error.message });
-      }
+      },
+      transactionId
     );
+  }
+
+  private async assertEventCharacteristicReady(device: Device): Promise<void> {
+    const normalizeUuid = (uuid: string) => uuid.trim().toLowerCase();
+
+    const services = await device.services();
+    const serviceOk = services.some((s) => normalizeUuid(s.uuid) === normalizeUuid(ESP32_SERVICE_UUID));
+    if (!serviceOk) {
+      throw new Error(`ESP32 service not found: ${ESP32_SERVICE_UUID}`);
+    }
+
+    const chars = await device.characteristicsForService(ESP32_SERVICE_UUID);
+    const ch = chars.find((c) => normalizeUuid(c.uuid) === normalizeUuid(ESP32_EVENT_CHAR_UUID));
+    if (!ch) {
+      throw new Error(`ESP32 event characteristic not found: ${ESP32_EVENT_CHAR_UUID}`);
+    }
+
+    if (!ch.isNotifiable && !ch.isIndicatable) {
+      throw new Error("ESP32 event characteristic is not notifiable/indicatable");
+    }
   }
 }
 

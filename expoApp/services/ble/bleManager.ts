@@ -79,7 +79,8 @@ export class GenericBleManager {
     serviceUUID: string,
     characteristicUUID: string,
     onValue: (valueBase64: string) => void,
-    onError: (error: BleError) => void
+    onError: (error: BleError) => void,
+    transactionId?: string
   ): Subscription {
     return device.monitorCharacteristicForService(
       serviceUUID,
@@ -94,7 +95,8 @@ export class GenericBleManager {
         if (!value) return;
 
         onValue(value);
-      }
+      },
+      transactionId
     );
   }
 
