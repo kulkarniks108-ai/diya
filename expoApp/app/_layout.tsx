@@ -1,11 +1,11 @@
+import { initHardwareTriggers } from "@/core/hardwareTriggers";
+import { esp32Adapter } from "@/services/ble/esp32Adapter";
 import { useAuthStore } from "@/store/auth";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import SafeScreen from "../components/SafeScreen";
-import { initHardwareTriggers } from "@/core/hardwareTriggers";
-import { esp32Adapter } from "@/services/ble/esp32Adapter";
 
 import "./global.css";
 
