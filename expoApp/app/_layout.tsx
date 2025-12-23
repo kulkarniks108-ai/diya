@@ -44,6 +44,17 @@ export default function RootLayout() {
     const inFamilyGroup = rootSegment === "(family)";
     const inLogoutScreen = inAuthGroup && segments[1] === "logout";
 
+//log all the values 
+    console.log("Navigation check:", {
+      authStatus,
+      user,
+      segments,
+      inAuthGroup,
+      inBlindGroup,
+      inFamilyGroup,
+      inLogoutScreen,
+    });
+
     if (!user) {
       // If signed out, don't allow landing on the logout confirmation screen.
       if (inLogoutScreen) {
@@ -65,6 +76,8 @@ export default function RootLayout() {
       router.replace(target);
       return;
     }
+
+    if(inLogoutScreen && user) return;
 
     if (user.role === "blind" && !inBlindGroup) {
       router.replace(target);
