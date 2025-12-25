@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "movie-app",
+    "name": "Diya",
     "slug": "movie-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -26,7 +26,12 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.anonymous.movieapp"
+      "package": "com.anonymous.movieapp",
+      "config": {
+        "googleMaps": {
+          "apiKey": "process.env.GOOGLE_MAPS_API_KEY"
+        }
+      }
     },
     "web": {
       "output": "static",
@@ -56,6 +61,13 @@
         "expo-image-picker",
         {
           "photosPermission": "The app accesses your photos to let you share them with your friends."
+        }
+      ],
+       [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "Allow $(PRODUCT_NAME) to use your location"
         }
       ]
     ],

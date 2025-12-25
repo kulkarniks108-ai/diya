@@ -4,7 +4,7 @@ export interface VisionResult {
 }
 
 export interface AnalyzeInput {
-  imageUri: string;
+  base64Image: string;
 
   // future-ready (safe to ignore for now)
   userIntent?: "general" | "medicine" | "text" | "obstacle";

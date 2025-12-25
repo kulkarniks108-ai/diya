@@ -1,51 +1,75 @@
-type VisionResult = {
-  description: string;
-};
+import axios from "axios";
 
-const USE_MOCK = true; // 👈 change to false later
+interface GeminiDescribeInput {
+  base64Image: string;
+  prompt?: string;
+  language?: string;
+}
 
-export async function analyzeImage(base64Image: string): Promise<VisionResult> {
-  if (USE_MOCK) {
-    // ✅ Mock response (what Google Vision WOULD return)
-    return {
-      description:
-        "There is a medicine packet in front of you. It appears to be paracetamol.",
+export async function describeWithGemini(
+  input: GeminiDescribeInput
+): Promise<string> {
+  console.log("description called");
+
+try {
+    const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) throw new Error("Missing EXPO_PUBLIC_GEMINI_API_KEY");
+  
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  
+    const defaultPrompt =
+      "You are assisting a blind person. Describe what is directly in front of the camera. " +
+      "Start with 'In front of you is...'. Keep it 2-3 short sentences. " +
+      "If there are obstacles or hazards visible, mention them. Respond in English.";
+  
+    const prompt =
+      input.prompt && input.prompt.trim().length > 0
+        ? input.prompt
+        : defaultPrompt;
+  
+    const body = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inline_data: {
+                mime_type: "image/jpeg",
+                data: input.base64Image,
+              },
+            },
+          ],
+        },
+      ],
     };
-  }
-
-  // 🔥 REAL GOOGLE VISION IMPLEMENTATION (READY BUT NOT USED YET)
-  const response = await fetch(
-    "https://vision.googleapis.com/v1/images:annotate?key=YOUR_API_KEY",
-    {
-      method: "POST",
+  
+    const res = await axios.post(endpoint, body, {
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        requests: [
-          {
-            image: { content: base64Image },
-            features: [
-              { type: "LABEL_DETECTION" },
-              { type: "TEXT_DETECTION" },
-            ],
-          },
-        ],
-      }),
+      // Optional: you can set a short timeout to avoid hanging
+      timeout: 20000,
+    });
+  
+    const candidates = (res.data && res.data.candidates) || [];
+    const first = candidates[0];
+    const parts = first?.content?.parts || [];
+    const textPart = parts.find((p: any) => typeof p?.text === "string");
+    const speechText = (textPart?.text || "").trim();
+  
+    if (!speechText) {
+      console.error("Gemini response missing text:", res.data);
+      throw new Error("Empty response from Gemini");
     }
-  );
-
-  if (!response.ok) {
-    throw new Error("Vision API failed");
+  
+    // console.log(speechText);
+  
+    return speechText;
+} catch (error: unknown) {
+  if (axios.isAxiosError(error)) {
+    console.error("Axios error in describeWithGemini:", error.message, error.response?.data);
+  } else {
+    console.error("Unexpected error in describeWithGemini:", error);
   }
-
-  const data = await response.json();
-
-  // extract meaningful text
-  const labels =
-    data.responses?.[0]?.labelAnnotations
-      ?.map((l: any) => l.description)
-      ?.join(", ") || "Unknown objects";
-
-  return {
-    description: `I see the following objects: ${labels}`,
-  };
+  throw error;
+  
+}
 }

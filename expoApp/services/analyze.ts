@@ -1,20 +1,16 @@
 import { AnalyzeInput, AnalyzeResult } from "@/types/vision";
+import { describeWithGemini } from "@/services/visionService";
 
-export async function analyze(
-  input: AnalyzeInput
-): Promise<AnalyzeResult> {
-  // ⚠️ TEMPORARY MOCK IMPLEMENTATION
-  // THIS FILE IS THE ONLY FILE YOU WILL CHANGE LATER
+export async function analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
+  try {
+    const speechText = await describeWithGemini({
+      base64Image: input.base64Image,
+      prompt: input.prompt,
+      language: input.language ?? "en",
+    });
 
-  await new Promise((r) => setTimeout(r, 800));
-
-  return {
-    speechText:
-      "There is a medicine packet in front of you. It appears to be paracetamol.",
-    vibrationPattern: 3,
-    metadata: {
-      objects: ["medicine packet"],
-      confidence: 0.82,
-    },
-  };
+    return { speechText };
+  } catch {
+    return { speechText: "error" };
+  }
 }

@@ -3,6 +3,7 @@ import { speak } from "@/services/speech";
 import { vibrate } from "@/services/vibration";
 import type { AnalyzeResult } from "@/types/vision";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 
 interface AssistOptions {
   imageUri?: string;
@@ -53,19 +54,17 @@ export async function assist(options: AssistOptions = {}): Promise<AnalyzeResult
 
     speak("Analyzing surroundings");
 
+    const base64Image = await FileSystem.readAsStringAsync(imageUri, { encoding: "base64" });
+
     const analysis = await analyze({
-      imageUri,
+      base64Image,
       language,
       detailed: false,
       prompt,
     });
-
-    speak(analysis.speechText);
-    vibrate(analysis.vibrationPattern);
-
     return analysis;
   } catch (err) {
-    speak("Something went wrong");
+    speak("error");
     throw err;
   }
 }
