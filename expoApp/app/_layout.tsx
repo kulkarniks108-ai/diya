@@ -44,16 +44,16 @@ export default function RootLayout() {
     const inFamilyGroup = rootSegment === "(family)";
     const inLogoutScreen = inAuthGroup && segments[1] === "logout";
 
-//log all the values 
-    console.log("Navigation check:", {
-      authStatus,
-      user,
-      segments,
-      inAuthGroup,
-      inBlindGroup,
-      inFamilyGroup,
-      inLogoutScreen,
-    });
+// log all the values 
+    // console.log("Navigation check:", {
+    //   authStatus,
+    //   user,
+    //   segments,
+    //   inAuthGroup,
+    //   inBlindGroup,
+    //   inFamilyGroup,
+    //   inLogoutScreen,
+    // });
 
     if (!user) {
       // If signed out, don't allow landing on the logout confirmation screen.

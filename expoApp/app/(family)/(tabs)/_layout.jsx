@@ -36,6 +36,15 @@ export default function FamilyTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="safety"
+        options={{
+          title: "Safety",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="heart-circle-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
