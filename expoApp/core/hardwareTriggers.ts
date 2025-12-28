@@ -1,9 +1,9 @@
 import { assist } from "@/core/assist";
-import { speak } from "@/services/speech";
 import { esp32Adapter } from "@/services/ble/esp32Adapter";
+import { speak } from "@/services/speech";
+import { useAuthStore } from "@/store/auth";
 import { useHardwareStore } from "@/store/hardware";
 import { useLiveStore } from "@/store/live";
-import { useAuthStore } from "@/store/auth";
 
 let initialized = false;
 
@@ -49,6 +49,15 @@ export function initHardwareTriggers(): void {
       return;
     }
 
-    // BUTTON_DOUBLE reserved for future
+    if (event.type === "BUTTON_DOUBLE") {
+      const liveStore = useLiveStore.getState();
+      if (liveStore.isTracking) {
+        speak("Stopping live location sharing");
+        liveStore.stopLiveTracking();
+      } else {
+        speak("Starting live location sharing");
+        await liveStore.startLiveTracking();
+      }
+    }
   });
 }

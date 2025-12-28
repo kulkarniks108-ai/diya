@@ -1,7 +1,8 @@
 import { db } from "@/config/firebase";
 import { useAuthStore } from "@/store/auth";
+import { sendSOS } from "@/utils/notifications/sendPush";
 import * as Location from "expo-location";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { create } from "zustand";
 
 interface LiveLocation {
@@ -166,6 +167,7 @@ stopLiveTracking: () => {
         throw new Error("Permission denied");
       }
 
+      // 1. Update Firestore status
       await setDoc(
         doc(db, "liveStatus", authUser.uid),
         {
@@ -176,6 +178,34 @@ stopLiveTracking: () => {
       );
 
       set({ sosActive: true });
+
+      // 2. Fetch linked family members directly from Firestore (Source of Truth)
+      const accessSnap = await getDoc(doc(db, "access", authUser.uid));
+      if (!accessSnap.exists()) return;
+
+      const { familyMembers } = accessSnap.data() as { familyMembers?: string[] };
+      if (!familyMembers || familyMembers.length === 0) return;
+
+      // 3. Fetch push tokens for all family members in parallel
+      const tokenPromises = familyMembers.map((uid) =>
+        getDoc(doc(db, "pushTokens", uid))
+      );
+      const tokenSnaps = await Promise.all(tokenPromises);
+
+      const tokens: string[] = [];
+      tokenSnaps.forEach((snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data?.token) {
+            tokens.push(data.token);
+          }
+        }
+      });
+
+      // 4. Send Push Notification
+      if (tokens.length > 0) {
+        await sendSOS(tokens, { url: "/(family)/safety" });
+      }
     } catch (err: any) {
       set({ error: err.message });
     }

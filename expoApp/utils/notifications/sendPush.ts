@@ -1,13 +1,14 @@
 
 import axios from "axios";
 
-export async function sendSOS(tokens: string[]) {
+export async function sendSOS(tokens: string[], data?: Record<string, any>) {
   const messages = tokens.map((to) => ({
     to,
     sound: "default",
     priority: "high",
     title: "🚨 SOS Alert",
     body: "Emergency detected. Tap to view location.",
+    data: data || {},
   }));
 
   try {
