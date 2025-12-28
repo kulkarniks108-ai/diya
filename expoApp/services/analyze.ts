@@ -1,7 +1,9 @@
-import { AnalyzeInput, AnalyzeResult } from "@/types/vision";
 import { describeWithGemini } from "@/services/visionService";
+import { AnalyzeInput, AnalyzeResult } from "@/types/vision";
 
 export async function analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
+
+  // return { speechText: "Analyzing... (stub)" };
   try {
     const speechText = await describeWithGemini({
       base64Image: input.base64Image,

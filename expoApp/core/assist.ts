@@ -1,9 +1,8 @@
 import { analyze } from "@/services/analyze";
 import { speak } from "@/services/speech";
-import { vibrate } from "@/services/vibration";
 import type { AnalyzeResult } from "@/types/vision";
-import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
 
 interface AssistOptions {
   imageUri?: string;
