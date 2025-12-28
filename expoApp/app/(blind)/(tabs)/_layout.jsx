@@ -29,6 +29,16 @@ export default function BlindTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          title: "Main",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="apps-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="home"
+        options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
