@@ -10,7 +10,7 @@ export async function describeWithGemini(
 ): Promise<string> {
   console.log("description called");
 
-  return "This will be relplaced with Gemini response.";
+  return "A small wireless earphone charging case is placed in front of you on the table.";
   
 // try {
 //     const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;

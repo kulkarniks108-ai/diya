@@ -11,10 +11,10 @@ import {
 import { create } from "zustand";
 
 interface LiveStatus {
-  lat: number;
-  lng: number;
-  updatedAt: any; // Firestore Timestamp or number
-  sos: boolean;
+  lat?: number;
+  lng?: number;
+  updatedAt?: any; // Firestore Timestamp or number
+  sos?: boolean;
 }
 
 interface FamilyState {
