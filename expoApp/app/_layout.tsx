@@ -9,6 +9,7 @@ import SafeScreen from "../components/SafeScreen";
 
 import { registerForPushNotifications } from "@/services/notification/notifications";
 import { savePushToken } from "@/services/notification/saveToken";
+import * as Notifications from "expo-notifications";
 import "./global.css";
 
 export default function RootLayout() {
@@ -18,7 +19,25 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
 
-   useEffect(() => {
+
+  useEffect(() => {
+  const subscription =
+    Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as {
+        url?: string;
+      };
+
+      if (data?.url) {
+        router.push(data.url as any);
+      }
+    });
+
+  return () => {
+    subscription.remove(); // ✅ NEW API
+  };
+}, [router]);
+
+  useEffect(() => {
     useAuthStore.getState().listenToAuthChanges();
   }, []);
 
@@ -36,29 +55,29 @@ export default function RootLayout() {
   }, [user]);
 
   useEffect(() => {
-  // Only after auth check is done
-  if (authStatus !== "signedIn") return;
+    // Only after auth check is done
+    if (authStatus !== "signedIn") return;
 
-  // Only family members receive notifications
-  if (!user || user.role !== "family") return;
+    // Only family members receive notifications
+    if (!user || user.role !== "family") return;
 
-  let cancelled = false;
+    let cancelled = false;
 
-  async function setupNotifications() {
-    const token = await registerForPushNotifications();
-    if (!token || cancelled) return;
+    async function setupNotifications() {
+      const token = await registerForPushNotifications();
+      if (!token || cancelled) return;
 
-    await savePushToken(token);
-  }
+      await savePushToken(token);
+    }
 
-  setupNotifications();
+    setupNotifications();
 
-  console.log("iihuhuh")
-  
-  return () => {
-    cancelled = true;
-  };
-}, [authStatus, user]);
+    console.log("iihuhuh")
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus, user]);
 
 
   useEffect(() => {
@@ -72,7 +91,7 @@ export default function RootLayout() {
     const inFamilyGroup = rootSegment === "(family)";
     const inLogoutScreen = inAuthGroup && segments[1] === "logout";
 
-// log all the values 
+    // log all the values 
     // console.log("Navigation check:", {
     //   authStatus,
     //   user,
@@ -105,7 +124,7 @@ export default function RootLayout() {
       return;
     }
 
-    if(inLogoutScreen && user) return;
+    if (inLogoutScreen && user) return;
 
     if (user.role === "blind" && !inBlindGroup) {
       router.replace(target);
@@ -117,7 +136,7 @@ export default function RootLayout() {
       return;
     }
   }, [authStatus, router, segments, user]);
-  
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />

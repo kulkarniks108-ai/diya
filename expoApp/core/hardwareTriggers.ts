@@ -34,7 +34,9 @@ export function initHardwareTriggers(): void {
 
       // If capture function isn't available (camera screen not mounted), request UI to open it.
       speak("Open the camera screen to capture surroundings");
-      useHardwareStore.getState().requestAction({ type: "ASSIST", seq: event.seq });
+      useHardwareStore
+        .getState()
+        .requestAction({ type: "ASSIST", seq: event.seq });
       return;
     }
 
