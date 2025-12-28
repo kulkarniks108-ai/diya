@@ -126,7 +126,7 @@ export default function SafetyScreen() {
         </View>
 
         {/* 3. Location Details Card */}
-        <View className="bg-white p-5 rounded-3xl shadow-sm mb-8">
+        {/* <View className="bg-white p-5 rounded-3xl shadow-sm mb-8">
           <View className="flex-row items-start gap-3">
             <Ionicons name="navigate-circle" size={24} color="#4B5563" />
             <View className="flex-1">
@@ -147,7 +147,7 @@ export default function SafetyScreen() {
               {getLastUpdatedText()}
             </Text>
           </View>
-        </View>
+        </View> */}
 
       </ScrollView>
     </SafeAreaView>
