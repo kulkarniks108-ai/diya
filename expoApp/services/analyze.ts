@@ -3,7 +3,7 @@ import { AnalyzeInput, AnalyzeResult } from "@/types/vision";
 
 export async function analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
 
-  // return { speechText: "Analyzing... (stub)" };
+  
   try {
     const speechText = await describeWithGemini({
       base64Image: input.base64Image,
@@ -12,7 +12,11 @@ export async function analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
     });
 
     return { speechText };
-  } catch {
-    return { speechText: "error" };
+  }  catch (error: unknown) {
+    if(error instanceof Error){
+     return { speechText: `Error during analysis: ${error.message}` };
+    } else {
+      return { speechText: "Unknown error during analysis." };
+    }
   }
 }

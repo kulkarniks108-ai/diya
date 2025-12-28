@@ -33,7 +33,7 @@ export async function assist(options: AssistOptions = {}): Promise<AnalyzeResult
     let imageUri = providedUri;
 
     if (!imageUri) {
-      speak("Capturing image");
+      speak("Capturing image.");
 
       if (captureFn) {
         imageUri = await captureFn();
@@ -51,7 +51,7 @@ export async function assist(options: AssistOptions = {}): Promise<AnalyzeResult
       throw new Error("No image URI available after capture");
     }
 
-    speak("Analyzing surroundings");
+    speak("Analyzing surroundings. core assist 54 nov ");
 
     const base64Image = await FileSystem.readAsStringAsync(imageUri, { encoding: "base64" });
 
@@ -61,7 +61,9 @@ export async function assist(options: AssistOptions = {}): Promise<AnalyzeResult
       detailed: false,
       prompt,
     });
+    speak(analysis.speechText);
     return analysis;
+
   } catch (err) {
     speak("error");
     throw err;
