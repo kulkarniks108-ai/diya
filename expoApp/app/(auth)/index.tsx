@@ -4,7 +4,6 @@ import { Link, router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Text,
@@ -39,11 +38,11 @@ export default function Login() {
       <View style={styles.container}>
         {/* ILLUSTRATION */}
         <View style={styles.topIllustration}>
-          <Image
+          {/* <Image
             source={require("../../assets/images/i.png")}
             style={styles.illustrationImage}
             resizeMode="contain"
-          />
+          /> */}
         </View>
 
         <View style={styles.card}>

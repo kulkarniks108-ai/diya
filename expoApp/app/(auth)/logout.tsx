@@ -4,7 +4,7 @@ import { useAuthStore } from "@/store/auth";
 import { router } from "expo-router";
 import { signOut } from "firebase/auth";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function Logout() {
 	const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -42,11 +42,11 @@ export default function Logout() {
 		<View className="px-5" style={styles.container}>
 			<View style={styles.card}>
 				<View style={styles.header}>
-					<Image
+					{/* <Image
 						source={require("../../assets/images/i.png")}
 						style={styles.illustration}
 						resizeMode="contain"
-					/>
+					/> */}
 					<Text style={styles.title}>Sign out</Text>
 					<Text style={styles.subtitle}>
 						{userEmail ? `You are signed in as ${userEmail}.` : "You are currently signed in."}
