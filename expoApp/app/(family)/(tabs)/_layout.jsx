@@ -26,17 +26,9 @@ export default function FamilyTabLayout() {
         },
       }}
     >
+     
       <Tabs.Screen
         name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="safety"
         options={{
           title: "Safety",
           tabBarIcon: ({ color, size }) => (
