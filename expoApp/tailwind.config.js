@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+
+import { TOKENS } from "./config/theme/tokens";
 module.exports = {
   content: [
     "./app/**/*.{js,jsx,ts,tsx}",
@@ -9,26 +11,22 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        bg: "#e8f5e9",
-        primary: "#4CAF50",
-        "primary-foreground": "#2e5a2e",
-        accent: "#4CAF50",
-         "accent-foreground": "#fff",
-        secondary: "#151312",
-        light: {
-          100: "#D6C7FF",
-          200: "#A8B5DB",
-          300: "#9CA4AB",
-        },
-        dark: {
-          100: "#221F3D",
-          200: "#0F0D23",
-        },
-        muted: "#767676",
-        input: "#f4faf5",
-        card: "#f1f8f2",
-        border: "#c8e6c9",
-      }
+        ...TOKENS
+      },
+
+      borderRadius: {
+        sm: 6,
+        md: 8,
+        lg: 12,
+        xl: 16,
+      },
+
+      // Android-first semantic shadows
+      boxShadow: {
+        sm: "0px 1px 2px rgba(0,0,0,0.05)",
+        md: "0px 2px 4px rgba(0,0,0,0.08)",
+        lg: "0px 4px 8px rgba(0,0,0,0.12)",
+      },
     }
   },
   plugins: [],

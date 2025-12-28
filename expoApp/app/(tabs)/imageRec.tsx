@@ -144,6 +144,8 @@ export default function ImageRec() {
         prompt: "Describe the surroundings and warn about obstacles",
         language: "en",
       });
+
+      
     } catch (err: unknown) {
       console.error("Error during assist:", err);
       setErrorMessage("Error analyzing image. Please try again later.");
