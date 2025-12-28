@@ -45,6 +45,15 @@ export default function BlindTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="debug"
+        options={{
+          title: "Debug",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bug-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: "Home",
