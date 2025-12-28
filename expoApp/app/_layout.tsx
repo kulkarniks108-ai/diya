@@ -7,6 +7,8 @@ import { useEffect, useRef } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import SafeScreen from "../components/SafeScreen";
 
+import { registerForPushNotifications } from "@/services/notification/notifications";
+import { savePushToken } from "@/services/notification/saveToken";
 import "./global.css";
 
 export default function RootLayout() {
@@ -32,6 +34,32 @@ export default function RootLayout() {
     bleStartedRef.current = true;
     void esp32Adapter.autoConnect();
   }, [user]);
+
+  useEffect(() => {
+  // Only after auth check is done
+  if (authStatus !== "signedIn") return;
+
+  // Only family members receive notifications
+  if (!user || user.role !== "family") return;
+
+  let cancelled = false;
+
+  async function setupNotifications() {
+    const token = await registerForPushNotifications();
+    if (!token || cancelled) return;
+
+    await savePushToken(token);
+  }
+
+  setupNotifications();
+
+  console.log("iihuhuh")
+  
+  return () => {
+    cancelled = true;
+  };
+}, [authStatus, user]);
+
 
   useEffect(() => {
     // Single source of truth for navigation based on auth + role.
