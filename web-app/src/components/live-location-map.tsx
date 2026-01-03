@@ -5,9 +5,10 @@ import { useEffect, useRef } from "react"
 interface LiveLocationMapProps {
   lat: number
   lng: number
+  recenterNonce?: number
 }
 
-export function LiveLocationMap({ lat, lng }: LiveLocationMapProps) {
+export function LiveLocationMap({ lat, lng, recenterNonce }: LiveLocationMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<import("mapbox-gl").Map | null>(null)
   const markerRef = useRef<import("mapbox-gl").Marker | null>(null)
@@ -56,8 +57,13 @@ export function LiveLocationMap({ lat, lng }: LiveLocationMapProps) {
     if (!map || !marker) return
 
     marker.setLngLat([lng, lat])
-    map.easeTo({ center: [lng, lat], duration: 500 })
   }, [lat, lng])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    map.easeTo({ center: [lng, lat], duration: 500 })
+  }, [lng, lat, recenterNonce])
 
   const hasToken = Boolean(process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN)
 
@@ -69,5 +75,5 @@ export function LiveLocationMap({ lat, lng }: LiveLocationMapProps) {
     )
   }
 
-  return <div ref={containerRef} className="h-80 w-full overflow-hidden rounded-md border" />
+  return <div ref={containerRef} className="h-full w-full" />
 }

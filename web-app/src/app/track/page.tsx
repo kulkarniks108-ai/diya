@@ -1,25 +1,19 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { LiveLocationMap } from "@/components/live-location-map"
+import { SafetyStatusCard } from "@/components/safety-status-card"
 import { useAuthStore } from "@/store/auth"
 import { useFamilyStore } from "@/store/family"
 import { useRouter } from "next/navigation"
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 
-function formatUpdatedAt(updatedAt: unknown): string {
-  if (!updatedAt) return "-"
+function toDate(updatedAt: unknown): Date | null {
+  if (!updatedAt) return null
 
   try {
     if (typeof updatedAt === "number") {
-      return new Date(updatedAt).toLocaleString()
+      return new Date(updatedAt)
     }
 
     if (
@@ -28,7 +22,7 @@ function formatUpdatedAt(updatedAt: unknown): string {
       "toDate" in updatedAt &&
       typeof (updatedAt as { toDate?: unknown }).toDate === "function"
     ) {
-      return (updatedAt as { toDate: () => Date }).toDate().toLocaleString()
+      return (updatedAt as { toDate: () => Date }).toDate()
     }
 
     if (
@@ -37,13 +31,24 @@ function formatUpdatedAt(updatedAt: unknown): string {
       "seconds" in updatedAt &&
       typeof (updatedAt as { seconds?: unknown }).seconds === "number"
     ) {
-      return new Date((updatedAt as { seconds: number }).seconds * 1000).toLocaleString()
+      return new Date((updatedAt as { seconds: number }).seconds * 1000)
     }
   } catch {
     // ignore
   }
 
-  return String(updatedAt)
+  return null
+}
+
+function formatLastUpdated(updatedAt: unknown): string {
+  const date = toDate(updatedAt)
+  if (!date) return "-"
+
+  const diffMs = Date.now() - date.getTime()
+  if (diffMs < 60_000) return "just now"
+
+  const minutes = Math.floor(diffMs / 60_000)
+  return `${minutes} minutes ago`
 }
 
 export default function TrackPage() {
@@ -51,12 +56,12 @@ export default function TrackPage() {
 
   const authStatus = useAuthStore((s) => s.authStatus)
   const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
+
+  const [recenterNonce, setRecenterNonce] = useState(0)
 
   const {
     connectionStatus,
     error,
-    linkedBlindUserId,
     blindUserLocation,
     findLinkedBlindUser,
     unsubscribeLiveStatus,
@@ -88,13 +93,13 @@ export default function TrackPage() {
     const lat = blindUserLocation?.lat
     const lng = blindUserLocation?.lng
     const sos = blindUserLocation?.sos
-    const updatedAt = formatUpdatedAt(blindUserLocation?.updatedAt)
+    const lastUpdatedText = formatLastUpdated(blindUserLocation?.updatedAt)
 
     return {
       lat: typeof lat === "number" ? lat : null,
       lng: typeof lng === "number" ? lng : null,
       sos: typeof sos === "boolean" ? sos : null,
-      updatedAt,
+      lastUpdatedText,
     }
   }, [blindUserLocation])
 
@@ -106,62 +111,63 @@ export default function TrackPage() {
     )
   }
 
+  const canRenderMap =
+    locationView.lat !== null &&
+    locationView.lng !== null &&
+    locationView.sos !== null
+
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-xl space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Live Tracking</CardTitle>
-            <CardDescription>
-              Showing live status from Firestore `liveStatus`.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm text-muted-foreground">
-                Status: <span className="text-foreground">{connectionStatus}</span>
-              </div>
-              <Button variant="outline" type="button" onClick={() => void logout()}>
-                Logout
-              </Button>
-            </div>
+    <div className="relative h-svh w-full overflow-hidden">
+      {(locationView.lat !== null &&
+    locationView.lng !== null &&
+    locationView.sos !== null) ? (
+        <div className="absolute inset-0">
+          <LiveLocationMap
+            lat={locationView.lat}
+            lng={locationView.lng}
+            recenterNonce={recenterNonce}
+          />
+        </div>
+      ) : null}
 
-            {error ? (
-              <div className="text-sm text-destructive">{error}</div>
-            ) : null}
-
-            <div className="grid gap-2 text-sm">
-              <div>
-                Linked blind user: <span className="font-mono">{linkedBlindUserId ?? "-"}</span>
-              </div>
-              <div>
-                Lat: <span className="font-mono">{locationView.lat ?? "-"}</span>
-              </div>
-              <div>
-                Lng: <span className="font-mono">{locationView.lng ?? "-"}</span>
-              </div>
-              <div>
-                Updated: <span className="font-mono">{locationView.updatedAt}</span>
-              </div>
-              <div>
-                SOS: <span className="font-mono">{locationView.sos ?? "-"}</span>
-              </div>
-            </div>
-
-            {locationView.lat !== null && locationView.lng !== null ? (
-              <LiveLocationMap lat={locationView.lat} lng={locationView.lng} />
-            ) : (
-              <p className="text-sm text-muted-foreground">Waiting for location...</p>
-            )}
-
-            {connectionStatus === "no-link" ? (
-              <p className="text-sm text-muted-foreground">
-                No linked blind user found for this family account.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+      <div className="absolute left-6 top-6 z-10">
+        {locationView.sos !== null ? (
+          <SafetyStatusCard sos={locationView.sos} lastUpdatedText={locationView.lastUpdatedText} />
+        ) : (
+          <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
+            No location data available
+          </div>
+        )}
       </div>
+
+      <div className="absolute right-6 top-6 z-10">
+        <Button variant="outline" type="button" onClick={() => router.push("/")}
+        >
+          Home
+        </Button>
+      </div>
+
+      <div className="absolute bottom-6 right-6 z-10">
+        <Button
+          type="button"
+          disabled={!canRenderMap}
+          onClick={() => setRecenterNonce((n) => n + 1)}
+        >
+          Recenter to blind
+        </Button>
+      </div>
+
+      {error || connectionStatus === "no-link" || !canRenderMap ? (
+        <div className="absolute inset-x-0 bottom-24 z-10 flex justify-center px-6">
+          <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">
+            {error
+              ? error
+              : connectionStatus === "no-link"
+                ? "No linked blind user found"
+                : "No location data available"}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
