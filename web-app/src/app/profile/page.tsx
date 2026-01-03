@@ -3,6 +3,9 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { useAuthStore } from "@/store/auth"
 import { useFamilyStore } from "@/store/family"
 import { useRouter } from "next/navigation"
@@ -11,11 +14,11 @@ import { Bell, Link2, LogOut, User, HelpCircle, FileText } from "lucide-react"
 import { FamilyTabs } from "@/components/family-tabs"
 
 function getStatusVariant(status: string, linked: boolean) {
-  if (!linked) return { bg: "bg-muted", text: "text-muted-foreground", label: "NOT LINKED" }
-  if (status === "connected") return { bg: "bg-primary/15", text: "text-primary", label: "CONNECTED" }
-  if (status === "searching") return { bg: "bg-muted", text: "text-foreground", label: "SEARCHING" }
-  if (status === "no-link") return { bg: "bg-muted", text: "text-muted-foreground", label: "NO LINK" }
-  return { bg: "bg-destructive/15", text: "text-destructive", label: "ERROR" }
+  if (!linked) return { variant: "secondary" as const, label: "NOT LINKED" }
+  if (status === "connected") return { variant: "default" as const, label: "CONNECTED" }
+  if (status === "searching") return { variant: "secondary" as const, label: "SEARCHING" }
+  if (status === "no-link") return { variant: "secondary" as const, label: "NO LINK" }
+  return { variant: "destructive" as const, label: "ERROR" }
 }
 
 export default function ProfilePage() {
@@ -130,9 +133,9 @@ export default function ProfilePage() {
                 <div className="mt-1 text-base font-medium">{user?.email ?? "-"}</div>
 
                 <div className="mt-4 text-xs font-semibold uppercase text-muted-foreground">Role</div>
-                <div className="mt-1 inline-flex rounded-lg bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
+                <Badge className="mt-1 w-fit" variant="secondary">
                   Family Member
-                </div>
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -148,9 +151,7 @@ export default function ProfilePage() {
               <div className="rounded-xl border bg-card p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-medium text-muted-foreground">Status</div>
-                  <div className={`rounded-full px-3 py-1 text-xs font-semibold ${statusChip.bg} ${statusChip.text}`}>
-                    {statusChip.label}
-                  </div>
+                  <Badge variant={statusChip.variant}>{statusChip.label}</Badge>
                 </div>
 
                 <div className="mt-3 flex items-center justify-between gap-3">
@@ -172,33 +173,33 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-base font-medium">SOS Alerts</div>
+                <div className="space-y-1">
+                  <Label htmlFor="sos-alerts" className="text-base font-medium">
+                    SOS Alerts
+                  </Label>
                   <div className="text-xs text-muted-foreground">Receive critical alerts immediately</div>
                 </div>
-                <Button
-                  type="button"
-                  variant={sosAlerts ? "default" : "outline"}
-                  onClick={() => setSosAlerts((v) => !v)}
-                >
-                  {sosAlerts ? "On" : "Off"}
-                </Button>
+                <Switch
+                  id="sos-alerts"
+                  checked={sosAlerts}
+                  onCheckedChange={(checked) => setSosAlerts(Boolean(checked))}
+                />
               </div>
 
               <Separator />
 
               <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-base font-medium">Location Updates</div>
+                <div className="space-y-1">
+                  <Label htmlFor="location-updates" className="text-base font-medium">
+                    Location Updates
+                  </Label>
                   <div className="text-xs text-muted-foreground">Get notified when tracking starts</div>
                 </div>
-                <Button
-                  type="button"
-                  variant={locationUpdates ? "default" : "outline"}
-                  onClick={() => setLocationUpdates((v) => !v)}
-                >
-                  {locationUpdates ? "On" : "Off"}
-                </Button>
+                <Switch
+                  id="location-updates"
+                  checked={locationUpdates}
+                  onCheckedChange={(checked) => setLocationUpdates(Boolean(checked))}
+                />
               </div>
             </CardContent>
           </Card>

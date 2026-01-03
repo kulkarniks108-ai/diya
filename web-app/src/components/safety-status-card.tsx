@@ -8,7 +8,7 @@ interface SafetyStatusCardProps {
 
 export function SafetyStatusCard({ sos, lastUpdatedText }: SafetyStatusCardProps) {
   return (
-    <Card className="w-[22rem] max-w-[calc(100vw-3rem)]">
+    <Card className=" p-0 w-[22rem] max-w-[calc(100vw-3rem)]">
       <CardContent className="flex items-start gap-3 p-4">
         <div className="mt-0.5">
           {sos ? (

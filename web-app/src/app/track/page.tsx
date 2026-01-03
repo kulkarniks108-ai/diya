@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button"
 import { LiveLocationMap } from "@/components/live-location-map"
 import { SafetyStatusCard } from "@/components/safety-status-card"
 import { FamilyTabs } from "@/components/family-tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuthStore } from "@/store/auth"
 import { useFamilyStore } from "@/store/family"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
+import { LocateFixed } from "lucide-react"
 
 function toDate(updatedAt: unknown): Date | null {
   if (!updatedAt) return null
@@ -57,7 +59,6 @@ export default function TrackPage() {
 
   const authStatus = useAuthStore((s) => s.authStatus)
   const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
 
   const [recenterNonce, setRecenterNonce] = useState(0)
 
@@ -118,12 +119,6 @@ export default function TrackPage() {
     locationView.lng !== null &&
     locationView.sos !== null
 
-  const onLogout = async () => {
-    unsubscribeLiveStatus()
-    await logout()
-    router.replace("/login")
-  }
-
   return (
     <div className="relative h-svh w-full overflow-hidden">
       {(locationView.lat !== null &&
@@ -142,9 +137,9 @@ export default function TrackPage() {
         {locationView.sos !== null ? (
           <SafetyStatusCard sos={locationView.sos} lastUpdatedText={locationView.lastUpdatedText} />
         ) : (
-          <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-            No location data available
-          </div>
+          <Alert className=" p-0 w-[22rem] max-w-[calc(100vw-3rem)]">
+            <AlertDescription>No location data available</AlertDescription>
+          </Alert>
         )}
       </div>
 
@@ -161,19 +156,21 @@ export default function TrackPage() {
           disabled={!canRenderMap}
           onClick={() => setRecenterNonce((n) => n + 1)}
         >
-          Recenter to blind
+         <LocateFixed />
         </Button>
       </div>
 
       {error || connectionStatus === "no-link" || !canRenderMap ? (
         <div className="absolute inset-x-0 bottom-24 z-10 flex justify-center px-6">
-          <div className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">
-            {error
-              ? error
-              : connectionStatus === "no-link"
-                ? "No linked blind user found"
-                : "No location data available"}
-          </div>
+          <Alert className="w-full max-w-md">
+            <AlertDescription>
+              {error
+                ? error
+                : connectionStatus === "no-link"
+                  ? "No linked blind user found"
+                  : "No location data available"}
+            </AlertDescription>
+          </Alert>
         </div>
       ) : null}
 
