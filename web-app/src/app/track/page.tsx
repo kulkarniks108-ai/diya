@@ -8,12 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { LiveLocationMap } from "@/components/live-location-map"
 import { useAuthStore } from "@/store/auth"
 import { useFamilyStore } from "@/store/family"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo } from "react"
 
-function formatUpdatedAt(updatedAt: any): string {
+function formatUpdatedAt(updatedAt: unknown): string {
   if (!updatedAt) return "-"
 
   try {
@@ -21,12 +22,22 @@ function formatUpdatedAt(updatedAt: any): string {
       return new Date(updatedAt).toLocaleString()
     }
 
-    if (typeof updatedAt?.toDate === "function") {
-      return updatedAt.toDate().toLocaleString()
+    if (
+      typeof updatedAt === "object" &&
+      updatedAt !== null &&
+      "toDate" in updatedAt &&
+      typeof (updatedAt as { toDate?: unknown }).toDate === "function"
+    ) {
+      return (updatedAt as { toDate: () => Date }).toDate().toLocaleString()
     }
 
-    if (typeof updatedAt?.seconds === "number") {
-      return new Date(updatedAt.seconds * 1000).toLocaleString()
+    if (
+      typeof updatedAt === "object" &&
+      updatedAt !== null &&
+      "seconds" in updatedAt &&
+      typeof (updatedAt as { seconds?: unknown }).seconds === "number"
+    ) {
+      return new Date((updatedAt as { seconds: number }).seconds * 1000).toLocaleString()
     }
   } catch {
     // ignore
@@ -136,6 +147,12 @@ export default function TrackPage() {
                 SOS: <span className="font-mono">{locationView.sos ?? "-"}</span>
               </div>
             </div>
+
+            {locationView.lat !== null && locationView.lng !== null ? (
+              <LiveLocationMap lat={locationView.lat} lng={locationView.lng} />
+            ) : (
+              <p className="text-sm text-muted-foreground">Waiting for location...</p>
+            )}
 
             {connectionStatus === "no-link" ? (
               <p className="text-sm text-muted-foreground">

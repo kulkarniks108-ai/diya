@@ -10,10 +10,15 @@ import {
 } from "firebase/firestore"
 import { create } from "zustand"
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return "Something went wrong"
+}
+
 export interface LiveStatus {
   lat?: number
   lng?: number
-  updatedAt?: any // Firestore Timestamp or number
+  updatedAt?: unknown // Firestore Timestamp or number
   sos?: boolean
 }
 
@@ -63,8 +68,8 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
       set({ linkedBlindUserId: blindUserId, connectionStatus: "connected" })
 
       get().subscribeToLiveStatus()
-    } catch (err: any) {
-      set({ error: err?.message ?? "Failed to find linked user", connectionStatus: "error" })
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err), connectionStatus: "error" })
     }
   },
 
