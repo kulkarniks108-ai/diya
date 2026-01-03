@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { LiveLocationMap } from "@/components/live-location-map"
 import { SafetyStatusCard } from "@/components/safety-status-card"
+import { FamilyTabs } from "@/components/family-tabs"
 import { useAuthStore } from "@/store/auth"
 import { useFamilyStore } from "@/store/family"
 import { useRouter } from "next/navigation"
@@ -56,6 +57,7 @@ export default function TrackPage() {
 
   const authStatus = useAuthStore((s) => s.authStatus)
   const user = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
 
   const [recenterNonce, setRecenterNonce] = useState(0)
 
@@ -116,6 +118,12 @@ export default function TrackPage() {
     locationView.lng !== null &&
     locationView.sos !== null
 
+  const onLogout = async () => {
+    unsubscribeLiveStatus()
+    await logout()
+    router.replace("/login")
+  }
+
   return (
     <div className="relative h-svh w-full overflow-hidden">
       {(locationView.lat !== null &&
@@ -141,13 +149,13 @@ export default function TrackPage() {
       </div>
 
       <div className="absolute right-6 top-6 z-10">
-        <Button variant="outline" type="button" onClick={() => router.push("/")}
-        >
-          Home
-        </Button>
+        <div className="flex flex-col gap-2">
+          
+         
+        </div>
       </div>
 
-      <div className="absolute bottom-6 right-6 z-10">
+      <div className="absolute bottom-24 right-6 z-10">
         <Button
           type="button"
           disabled={!canRenderMap}
@@ -168,6 +176,8 @@ export default function TrackPage() {
           </div>
         </div>
       ) : null}
+
+      <FamilyTabs />
     </div>
   )
 }
