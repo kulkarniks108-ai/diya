@@ -1,11 +1,8 @@
 import { useFamilyStore } from "@/store/familyStore";
 import { Ionicons } from "@expo/vector-icons";
-import MapLibreGL from "@maplibre/maplibre-react-native";
 import React, { useEffect } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-MapLibreGL.setAccessToken(null);
 
 export default function SafetyScreen() {
   const {
@@ -21,15 +18,15 @@ export default function SafetyScreen() {
     return () => {
       unsubscribeLiveStatus();
     };
-  }, [findLinkedBlindUser, unsubscribeLiveStatus]);
+  }, []);
 
   // Helper to format timestamp
   const getLastUpdatedText = () => {
     if (!blindUserLocation?.updatedAt) return "Waiting for updates...";
-
+    
     // Handle Firestore Timestamp or JS Date/Number
-    const date = blindUserLocation.updatedAt.toDate
-      ? blindUserLocation.updatedAt.toDate()
+    const date = blindUserLocation.updatedAt.toDate 
+      ? blindUserLocation.updatedAt.toDate() 
       : new Date(blindUserLocation.updatedAt);
 
     const now = new Date();
@@ -42,14 +39,14 @@ export default function SafetyScreen() {
   const isSOS = blindUserLocation?.sos || false;
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 bg-red-400">
-      <ScrollView className=" h-full flex-1 px-4 pt-4 bg-green-500">
-
+    <SafeAreaView className="flex-1 bg-gray-50">
+      <ScrollView className="flex-1 px-4 pt-4">
+        
         {/* Header */}
         <View className="flex-row justify-between items-center mb-6">
           <Text className="text-2xl font-bold text-gray-800">Safety Monitor</Text>
           <TouchableOpacity onPress={() => findLinkedBlindUser()}>
-            <Ionicons name="refresh" size={24} color="#666" />
+             <Ionicons name="refresh" size={24} color="#666" />
           </TouchableOpacity>
         </View>
 
@@ -70,10 +67,10 @@ export default function SafetyScreen() {
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
               <View className={`w-12 h-12 rounded-full items-center justify-center ${isSOS ? 'bg-red-100' : 'bg-green-100'}`}>
-                <Ionicons
-                  name={isSOS ? "warning" : "shield-checkmark"}
-                  size={24}
-                  color={isSOS ? "#DC2626" : "#16A34A"}
+                <Ionicons 
+                  name={isSOS ? "warning" : "shield-checkmark"} 
+                  size={24} 
+                  color={isSOS ? "#DC2626" : "#16A34A"} 
                 />
               </View>
               <View>
@@ -86,9 +83,9 @@ export default function SafetyScreen() {
               </View>
             </View>
             {isSOS && (
-              <View className="bg-red-50 px-3 py-1 rounded-full border border-red-100">
-                <Text className="text-xs text-red-600 font-medium">ALERT</Text>
-              </View>
+               <View className="bg-red-50 px-3 py-1 rounded-full border border-red-100">
+                 <Text className="text-xs text-red-600 font-medium">ALERT</Text>
+               </View>
             )}
           </View>
           <Text className="text-gray-400 text-xs mt-3 ml-1">
@@ -97,11 +94,11 @@ export default function SafetyScreen() {
         </View>
 
         {/* 2. Map Placeholder (Coords) */}
-        <View className="bg-white rounded-3xl shadow-sm overflow-hidden mb-4 h-full relative">
+        <View className="bg-white rounded-3xl shadow-sm overflow-hidden mb-4 h-80 relative">
           {/* Background decoration to look like a map placeholder */}
-          {/* <View className="absolute inset-0 bg-blue-50 opacity-50" /> */}
-
-          {/* <View className="flex-1 items-center justify-center p-6">
+          <View className="absolute inset-0 bg-blue-50 opacity-50" />
+          
+          <View className="flex-1 items-center justify-center p-6">
             {blindUserLocation ? (
               <View className="items-center">
                 <View className="w-16 h-16 bg-blue-500 rounded-full items-center justify-center mb-4 shadow-lg border-4 border-white">
@@ -119,40 +116,13 @@ export default function SafetyScreen() {
               <View className="items-center">
                 <Ionicons name="location-outline" size={48} color="#CBD5E1" />
                 <Text className="text-gray-400 mt-2 text-center">
-                  {connectionStatus === 'connected'
-                    ? "Waiting for location data..."
+                  {connectionStatus === 'connected' 
+                    ? "Waiting for location data..." 
                     : "Location unavailable"}
                 </Text>
               </View>
             )}
-          </View> */}
-
-          {/* new */}
-          {
-            (blindUserLocation?.lng && blindUserLocation?.lat) &&(
-              <View className="flex-1">
-            <MapLibreGL.MapView  style={{ flex: 1, height: 300 }} mapStyle="https://demotiles.maplibre.org/style.json">
-              <MapLibreGL.Camera
-                centerCoordinate={[
-                  blindUserLocation?.lng,
-                  blindUserLocation?.lat,
-                ]}
-                zoomLevel={15}
-                animationMode="flyTo"
-                animationDuration={1000}
-              />
-
-              {/* <MapLibreGL.PointAnnotation
-                id="blind-person"
-                coordinate={[
-                  blindUserLocation?.lng,
-                 blindUserLocation?.lat
-                ]}
-              /> */}
-            </MapLibreGL.MapView>
           </View>
-            )
-          }
         </View>
 
         {/* 3. Location Details Card */}
