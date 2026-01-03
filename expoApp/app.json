@@ -76,6 +76,7 @@
           "color": "#4CAF50"
         }
       ]
+      
     ],
     "experiments": {
       "typedRoutes": true,
