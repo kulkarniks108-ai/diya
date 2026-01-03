@@ -1,11 +1,11 @@
-import { describeWithGemini } from "@/services/visionService";
+import { describeWithAI } from "@/services/visionService";
 import { AnalyzeInput, AnalyzeResult } from "@/types/vision";
 
 export async function analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
 
   
   try {
-    const speechText = await describeWithGemini({
+    const speechText = await describeWithAI({
       base64Image: input.base64Image,
       prompt: input.prompt,
       language: input.language ?? "en",
