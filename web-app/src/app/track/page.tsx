@@ -5,6 +5,7 @@ import { LiveLocationMap } from "@/components/live-location-map"
 import { SafetyStatusCard } from "@/components/safety-status-card"
 import { FamilyTabs } from "@/components/family-tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useSosBrowserNotification } from "@/hooks/use-sos-browser-notification"
 import { useAuthStore } from "@/store/auth"
 import { useFamilyStore } from "@/store/family"
 import { useRouter } from "next/navigation"
@@ -106,6 +107,11 @@ export default function TrackPage() {
     }
   }, [blindUserLocation])
 
+  useSosBrowserNotification({
+    sos: locationView.sos,
+    lastUpdatedText: locationView.lastUpdatedText,
+  })
+
   if (authStatus === "checking") {
     return (
       <div className="flex min-h-svh items-center justify-center p-6">
@@ -121,9 +127,7 @@ export default function TrackPage() {
 
   return (
     <div className="relative h-svh w-full overflow-hidden">
-      {(locationView.lat !== null &&
-    locationView.lng !== null &&
-    locationView.sos !== null) ? (
+      {locationView.lat !== null && locationView.lng !== null && locationView.sos !== null ? (
         <div className="absolute inset-0">
           <LiveLocationMap
             lat={locationView.lat}
@@ -137,7 +141,7 @@ export default function TrackPage() {
         {locationView.sos !== null ? (
           <SafetyStatusCard sos={locationView.sos} lastUpdatedText={locationView.lastUpdatedText} />
         ) : (
-          <Alert className=" p-0 w-[22rem] max-w-[calc(100vw-3rem)]">
+          <Alert className="w-88 max-w-[calc(100vw-3rem)] p-0">
             <AlertDescription>No location data available</AlertDescription>
           </Alert>
         )}

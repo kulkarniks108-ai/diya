@@ -8,10 +8,17 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useAuthStore } from "@/store/auth"
 import { useFamilyStore } from "@/store/family"
+import { getBooleanPreference, setBooleanPreference } from "@/lib/preferences"
+import {
+  getNotificationPermission,
+  isNotificationSupported,
+  requestNotificationPermission,
+} from "@/services/browser-notifications"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { Bell, Link2, LogOut, User, HelpCircle, FileText } from "lucide-react"
 import { FamilyTabs } from "@/components/family-tabs"
+import { toast } from "sonner"
 
 function getStatusVariant(status: string, linked: boolean) {
   if (!linked) return { variant: "secondary" as const, label: "NOT LINKED" }
@@ -35,24 +42,10 @@ export default function ProfilePage() {
     unsubscribeLiveStatus,
   } = useFamilyStore()
 
-  const [sosAlerts, setSosAlerts] = useState(() => {
-    if (typeof window === "undefined") return true
-    try {
-      const saved = localStorage.getItem("sosAlerts")
-      return saved === null ? true : saved === "true"
-    } catch {
-      return true
-    }
-  })
-  const [locationUpdates, setLocationUpdates] = useState(() => {
-    if (typeof window === "undefined") return true
-    try {
-      const saved = localStorage.getItem("locationUpdates")
-      return saved === null ? true : saved === "true"
-    } catch {
-      return true
-    }
-  })
+  const [sosAlerts, setSosAlerts] = useState(() => getBooleanPreference("sosAlerts", true))
+  const [locationUpdates, setLocationUpdates] = useState(() =>
+    getBooleanPreference("locationUpdates", true),
+  )
 
   useEffect(() => {
     if (authStatus === "checking") return
@@ -77,19 +70,11 @@ export default function ProfilePage() {
   }, [authStatus, findLinkedBlindUser, router, unsubscribeLiveStatus, user])
 
   useEffect(() => {
-    try {
-      localStorage.setItem("sosAlerts", String(sosAlerts))
-    } catch {
-      // ignore
-    }
+    setBooleanPreference("sosAlerts", sosAlerts)
   }, [sosAlerts])
 
   useEffect(() => {
-    try {
-      localStorage.setItem("locationUpdates", String(locationUpdates))
-    } catch {
-      // ignore
-    }
+    setBooleanPreference("locationUpdates", locationUpdates)
   }, [locationUpdates])
 
   const statusChip = useMemo(() => {
@@ -101,6 +86,41 @@ export default function ProfilePage() {
     unsubscribeLiveStatus()
     await logout()
     router.replace("/login")
+  }
+
+  const onToggleSosAlerts = async (checked: boolean) => {
+    if (!checked) {
+      setSosAlerts(false)
+      return
+    }
+
+    if (!isNotificationSupported()) {
+      toast.error("Notifications are not supported in this browser.")
+      setSosAlerts(false)
+      return
+    }
+
+    const currentPermission = getNotificationPermission()
+    if (currentPermission === "denied") {
+      toast.error("Notifications are blocked. Enable them in browser settings.")
+      setSosAlerts(false)
+      return
+    }
+
+    if (currentPermission === "granted") {
+      setSosAlerts(true)
+      return
+    }
+
+    const requested = await requestNotificationPermission()
+    if (requested === "granted") {
+      toast.success("SOS notifications enabled.")
+      setSosAlerts(true)
+      return
+    }
+
+    toast.error("Notification permission not granted.")
+    setSosAlerts(false)
   }
 
   if (authStatus === "checking") {
@@ -182,7 +202,9 @@ export default function ProfilePage() {
                 <Switch
                   id="sos-alerts"
                   checked={sosAlerts}
-                  onCheckedChange={(checked) => setSosAlerts(Boolean(checked))}
+                  onCheckedChange={(checked) => {
+                    void onToggleSosAlerts(Boolean(checked))
+                  }}
                 />
               </div>
 
