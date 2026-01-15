@@ -7,6 +7,12 @@ import { useHardwareStore } from "@/store/hardware";
 import { useLiveStore } from "@/store/live";
 
 let initialized = false;
+const DEBOUNCE_TIME_MS = 3000;
+const lastTriggerTime: Record<string, number> = {
+  BUTTON_SHORT: 0,
+  BUTTON_LONG: 0,
+  BUTTON_DOUBLE: 0,
+};
 
 export function initHardwareTriggers(): void {
   if (initialized) return;
@@ -17,6 +23,14 @@ export function initHardwareTriggers(): void {
     if (!authUser || authUser.role !== "blind") {
       return;
     }
+
+    const now = Date.now();
+    const lastTime = lastTriggerTime[event.type] ?? 0;
+    if (now - lastTime < DEBOUNCE_TIME_MS) {
+      console.log(`Hardware trigger debounced: ${event.type}`);
+      return;
+    }
+    lastTriggerTime[event.type] = now;
 
     if (event.type === "BUTTON_SHORT") {
       console.log("Hardware trigger: BUTTON_SHORT");
