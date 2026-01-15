@@ -17,7 +17,6 @@ import {
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { Bell, Link2, LogOut, User, HelpCircle, FileText } from "lucide-react"
-import { FamilyTabs } from "@/components/family-tabs"
 import { toast } from "sonner"
 
 function getStatusVariant(status: string, linked: boolean) {
@@ -268,7 +267,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <FamilyTabs />
     </div>
   )
 }

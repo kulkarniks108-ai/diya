@@ -15,7 +15,7 @@ export function FamilyTabs() {
   ]
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-20 flex justify-center px-4">
       <Card className="pointer-events-auto w-full max-w-sm rounded-2xl p-2">
         <div className="grid grid-cols-2 gap-1">
           {tabs.map((tab) => {

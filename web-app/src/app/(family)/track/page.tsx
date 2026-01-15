@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button"
 import { LiveLocationMap } from "@/components/live-location-map"
 import { SafetyStatusCard } from "@/components/safety-status-card"
-import { FamilyTabs } from "@/components/family-tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useSosBrowserNotification } from "@/hooks/use-sos-browser-notification"
 import { useAuthStore } from "@/store/auth"
@@ -178,7 +177,6 @@ export default function TrackPage() {
         </div>
       ) : null}
 
-      <FamilyTabs />
     </div>
   )
 }
