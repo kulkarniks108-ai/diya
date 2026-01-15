@@ -1,3 +1,4 @@
+import { PROMPTS } from "@/constants/prompt";
 import { assist } from "@/core/assist";
 import { esp32Adapter } from "@/services/ble/esp32Adapter";
 import { speak } from "@/services/speech";
@@ -18,12 +19,13 @@ export function initHardwareTriggers(): void {
     }
 
     if (event.type === "BUTTON_SHORT") {
+      console.log("Hardware trigger: BUTTON_SHORT");
       const captureFn = useHardwareStore.getState().captureFn;
       if (captureFn) {
         try {
           await assist({
             captureFn,
-            prompt: "Describe the surroundings and warn about obstacles",
+            prompt: PROMPTS.imageAssist.DescribeInShortFocus,
             language: "en",
           });
         } catch {
@@ -51,15 +53,43 @@ export function initHardwareTriggers(): void {
       return;
     }
 
-    if (event.type === "BUTTON_DOUBLE") {
-      const liveStore = useLiveStore.getState();
-      if (liveStore.isTracking) {
-        speak("Stopping live location sharing");
-        liveStore.stopLiveTracking();
-      } else {
-        speak("Starting live location sharing");
-        await liveStore.startLiveTracking();
+    // if (event.type === "BUTTON_DOUBLE") {
+    //   const liveStore = useLiveStore.getState();
+    //   if (liveStore.isTracking) {
+    //     speak("Stopping live location sharing");
+    //     liveStore.stopLiveTracking();
+    //   } else {
+    //     speak("Starting live location sharing");
+    //     await liveStore.startLiveTracking();
+    //   }
+    // }
+
+    if(event.type === "BUTTON_DOUBLE"){
+      
+      console.log("Hardware trigger: BUTTON_SHORT");
+      const captureFn = useHardwareStore.getState().captureFn;
+      if (captureFn) {
+        try {
+          await assist({
+            captureFn,
+            prompt: PROMPTS.imageAssist.DescribeInLongDetail,
+            language: "en",
+          });
+        } catch {
+          // assist() already speaks an error
+        }
+        return;
       }
+
+      // If capture function isn't available (camera screen not mounted), request UI to open it.
+      speak("Open the camera screen to capture surroundings");
+      useHardwareStore
+        .getState()
+        .requestAction({ type: "ASSIST", seq: event.seq });
+      return;
+    
     }
+
+
   });
 }

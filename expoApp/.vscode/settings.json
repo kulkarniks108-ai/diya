@@ -5,7 +5,7 @@
     "source.sortMembers": "explicit"
   },
   "prisma-smart-formatter.typescript.defaultFormatter": "esbenp.prettier-vscode",
-  "prisma-smart-formatter.typescriptreact.defaultFormatter": "vscode.typescript-language-features",
+  "prisma-smart-formatter.typescriptreact.defaultFormatter": "esbenp.prettier-vscode",
   "prisma-smart-formatter.prisma.defaultFormatter": "Prisma.prisma",
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
