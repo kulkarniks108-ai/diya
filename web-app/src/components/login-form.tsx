@@ -32,11 +32,7 @@ export function LoginForm({
 
   useEffect(() => {
     if (authStatus !== "signedIn" || !user) return
-    if (user.role === "family") {
-      router.replace("/track")
-    } else {
-      router.replace("/blind")
-    }
+    router.replace("/")
   }, [authStatus, router, user])
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
