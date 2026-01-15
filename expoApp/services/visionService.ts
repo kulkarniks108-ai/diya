@@ -10,11 +10,7 @@ interface DescribeInput {
   language?: string;
 }
 
-export async function describeWithAI(
-  input: DescribeInput
-): Promise<string> {
-
-  console.log("api key is", process.env.EXPO_PUBLIC_OPENAI_API_KEY);
+export async function describeWithAI(input: DescribeInput): Promise<string> {
   try {
     const res = await generateSpeech({
       userPrompt: input.prompt || "Describe the image for me.",
@@ -23,7 +19,7 @@ export async function describeWithAI(
       base64Image: input.base64Image,
     });
 
-    console.log("te response is", res);
+    // console.log("te response is", res);
     return res.speech;
   } catch (error) {
     console.error("Error in describeWithAI:", error);
@@ -41,6 +37,14 @@ export async function generateSpeech({
   systemPrompt: string;
   base64Image: string;
 }): Promise<{ speech: string }> {
+  const fakeResponse = true;
+  if (fakeResponse) {
+    return {
+      speech:
+        "fake describeWithAI you have a one plus buds infront of you. and by the way,  this is a fake response cuz we are poor",
+    };
+  }
+
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
