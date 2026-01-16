@@ -37,7 +37,7 @@ export async function generateSpeech({
   systemPrompt: string;
   base64Image: string;
 }): Promise<{ speech: string }> {
-  const fakeResponse = true;
+  const fakeResponse = false;
   if (fakeResponse) {
     return {
       speech:
