@@ -1,6 +1,7 @@
 import { LandingHero } from "@/components/landing/landing-hero"
 import { LandingCTA } from "@/components/landing/landing-cta"
 import LandingFeatures from "@/components/landing/landing-features"
+import Testimonials from "@/components/landing/landing-testimonials"
 
 export default function LandingPage() {
   return (
@@ -13,6 +14,10 @@ export default function LandingPage() {
         </section>
         <section className=" mb-24 border-2 ">
           <LandingFeatures />
+        </section>
+
+        <section className=" mb-24 border-2 ">
+          <Testimonials />
         </section>
       </main>
     </div>
