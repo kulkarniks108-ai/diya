@@ -41,7 +41,7 @@ export async function generateSpeech({
   if (fakeResponse) {
     return {
       speech:
-        "fake describeWithAI you have a one plus buds infront of you. and by the way,  this is a fake response cuz we are poor",
+        "fake describeWithAI you have a one plus buds infront of you. and by the way,  this is a fake response",
     };
   }
 
