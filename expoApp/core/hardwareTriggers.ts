@@ -67,20 +67,7 @@ export function initHardwareTriggers(): void {
       return;
     }
 
-    // if (event.type === "BUTTON_DOUBLE") {
-    //   const liveStore = useLiveStore.getState();
-    //   if (liveStore.isTracking) {
-    //     speak("Stopping live location sharing");
-    //     liveStore.stopLiveTracking();
-    //   } else {
-    //     speak("Starting live location sharing");
-    //     await liveStore.startLiveTracking();
-    //   }
-    // }
-
-    if(event.type === "BUTTON_DOUBLE"){
-      
-      console.log("Hardware trigger: BUTTON_SHORT");
+    if (event.type === "BUTTON_DOUBLE") {
       const captureFn = useHardwareStore.getState().captureFn;
       if (captureFn) {
         try {
@@ -101,9 +88,6 @@ export function initHardwareTriggers(): void {
         .getState()
         .requestAction({ type: "ASSIST", seq: event.seq });
       return;
-    
     }
-
-
   });
 }

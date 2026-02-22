@@ -1,3 +1,4 @@
+import { PROMPTS } from "@/constants/prompt";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 
@@ -18,9 +19,8 @@ interface DescribeInput {
 export async function describeWithAI(input: DescribeInput): Promise<string> {
   try {
     const res = await generateSpeechWithGemini({
-      userPrompt: input.prompt || "Describe the image for me.",
-      systemPrompt:
-        "You are a helpful assistant that describes images for visually impaired users keep it short and crisp and focus on what is at the center of the image.",
+      userPrompt: input.prompt || PROMPTS.imageAssist.DescribeInShortFocus,
+      systemPrompt: PROMPTS.imageAssist.SystemPrompt,
       base64Image: input.base64Image,
     });
 
