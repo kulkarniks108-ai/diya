@@ -21,7 +21,9 @@ const DEFAULT_LANGUAGE = "en";
  * - Else if `captureFn` is provided, uses it for programmatic capture.
  * - Else falls back to ImagePicker camera (system UI).
  */
-export async function assist(options: AssistOptions = {}): Promise<AnalyzeResult> {
+export async function assist(
+  options: AssistOptions = {},
+): Promise<AnalyzeResult> {
   const {
     imageUri: providedUri,
     prompt = DEFAULT_PROMPT,
@@ -51,9 +53,11 @@ export async function assist(options: AssistOptions = {}): Promise<AnalyzeResult
       throw new Error("No image URI available after capture");
     }
 
-    speak("Analyzing surroundings. core assist 54 nov ");
+    speak("Analyzing surroundings.");
 
-    const base64Image = await FileSystem.readAsStringAsync(imageUri, { encoding: "base64" });
+    const base64Image = await FileSystem.readAsStringAsync(imageUri, {
+      encoding: "base64",
+    });
 
     const analysis = await analyze({
       base64Image,
@@ -63,7 +67,6 @@ export async function assist(options: AssistOptions = {}): Promise<AnalyzeResult
     });
     speak(analysis.speechText);
     return analysis;
-
   } catch (err) {
     speak("error");
     throw err;

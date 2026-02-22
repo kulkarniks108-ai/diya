@@ -1,7 +1,12 @@
+import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 
 const client = new OpenAI({
   apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
+});
+
+const geminiClient = new GoogleGenAI({
+  apiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY!,
 });
 
 interface DescribeInput {
@@ -12,7 +17,7 @@ interface DescribeInput {
 
 export async function describeWithAI(input: DescribeInput): Promise<string> {
   try {
-    const res = await generateSpeech({
+    const res = await generateSpeechWithGemini({
       userPrompt: input.prompt || "Describe the image for me.",
       systemPrompt:
         "You are a helpful assistant that describes images for visually impaired users keep it short and crisp and focus on what is at the center of the image.",
@@ -28,7 +33,7 @@ export async function describeWithAI(input: DescribeInput): Promise<string> {
   // return "A small wireless earphone charging case is placed in front of you on the table.";
 }
 
-export async function generateSpeech({
+export async function generateSpeechWithOpenAI({
   userPrompt,
   systemPrompt,
   base64Image,
@@ -71,4 +76,50 @@ export async function generateSpeech({
   return {
     speech: response.choices[0].message.content ?? "",
   };
+}
+
+export async function generateSpeechWithGemini({
+  userPrompt,
+  systemPrompt,
+  base64Image,
+}: {
+  userPrompt: string;
+  systemPrompt: string;
+  base64Image: string;
+}): Promise<{ speech: string }> {
+  try {
+    // Remove base64 prefix if present
+    const cleanedBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
+
+    // const models = await geminiClient.models.list();
+    // console.log(JSON.stringify(models, null, 2));
+
+    const response = await geminiClient.models.generateContent({
+      model: "gemini-2.5-flash",
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: userPrompt },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: cleanedBase64,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    return {
+      speech: response.text ?? "",
+    };
+  } catch (error) {
+    console.error("Error in generateSpeechWithGemini:", error);
+    throw error;
+  }
 }

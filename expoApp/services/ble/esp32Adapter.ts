@@ -90,22 +90,36 @@ export class Esp32Adapter {
       }
     }
 
-    // NOTE: Intentionally not calling this.notifySub.remove() here.
-    // On some Android + RN versions, react-native-ble-plx can crash the process
-    // via a NullPointerException inside its cancel/reject path.
-    // Disconnecting the device is sufficient to stop notifications.
-    this.notifySub = null;
+    // Clean up notification subscription safely
+    if (this.notifySub) {
+      try {
+        this.notifySub.remove();
+      } catch (error) {
+        // Ignore errors during cleanup - device may already be disconnected
+        console.warn("Failed to remove notification subscription:", error);
+      }
+      this.notifySub = null;
+    }
     this.notifyTransactionId = null;
 
     if (this.disconnectSub) {
-      this.disconnectSub.remove();
+      try {
+        this.disconnectSub.remove();
+      } catch (error) {
+        console.warn("Failed to remove disconnect subscription:", error);
+      }
       this.disconnectSub = null;
     }
 
     if (this.device) {
       const id = this.device.id;
       this.device = null;
-      await bleManagerSingleton.disconnect(id);
+      try {
+        await bleManagerSingleton.disconnect(id);
+      } catch (error) {
+        // Device may already be disconnected
+        console.warn("Failed to disconnect device:", error);
+      }
     }
 
     this.setState({ state: "idle" });
@@ -138,9 +152,21 @@ export class Esp32Adapter {
 
       // Keep internal state in sync on unexpected disconnects.
       this.disconnectSub = connected.onDisconnected((error) => {
+        console.log("Device disconnected:", deviceId, error?.message);
+        
+        // Clean up subscriptions safely
+        if (this.notifySub) {
+          try {
+            this.notifySub.remove();
+          } catch (e) {
+            console.warn("Failed to cleanup notification subscription on disconnect:", e);
+          }
+        }
+        
         this.device = null;
         this.notifySub = null;
         this.notifyTransactionId = null;
+        
         if (error) {
           this.setState({ state: "error", message: error.message });
         } else {
