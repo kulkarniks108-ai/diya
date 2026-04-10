@@ -1,1 +1,4 @@
 .history/
+# env files
+.env*.local
+.env 
