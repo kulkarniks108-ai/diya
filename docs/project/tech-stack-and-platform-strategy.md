@@ -71,6 +71,7 @@ Examples:
 Design goal:
 - Smartphone remains intelligence and orchestration center
 - Accessories act as composable capability modules
+- Multiple Accessories with multiple connection modes can be connected to the app at once
 
 ## Integration and Extensibility Model
 
