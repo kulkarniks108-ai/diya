@@ -4,8 +4,8 @@ This document outlines the architectural approach for the production-grade Flutt
 
 ## Clean Architecture
 - **Separation of Concerns:** Divides code into layers (Presentation, Domain, Data) to isolate business logic from UI and infrastructure.
-- **Testability:** Business logic is decoupled from frameworks, making unit testing straightforward.
 - **Scalability:** New features and integrations can be added with minimal impact on existing code.
+- **Background-safe boundaries:** Device orchestration, retries, and session management live outside UI code so the app can recover even when screens are closed.
 
 ## Riverpod for State Management
 - **Robust State Handling:** Riverpod provides a scalable, testable, and type-safe approach to state management.
@@ -21,6 +21,10 @@ This document outlines the architectural approach for the production-grade Flutt
 - **Enterprise-Ready:** Proven patterns for large, maintainable codebases.
 - **Flexibility:** Easy to swap backend or platform-specific implementations.
 - **Community Support:** All choices are widely adopted and well-documented.
+
+## Stability Guideline
+- The app should be designed so the user does the setup once, then the system handles most routine device coordination automatically in the background.
+- Any feature that impacts live safety, reconnects, or accessory state should be modeled as a service contract, not as a screen-only interaction.
 
 ---
 
