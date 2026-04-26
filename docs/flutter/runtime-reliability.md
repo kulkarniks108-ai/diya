@@ -16,7 +16,7 @@ This document outlines strategies for ensuring reliability, safety, and robust r
 
 ## Error Handling & Observability
 - **Centralized Error Handling:** Catch and report errors globally; surface actionable feedback to users.
-- **Logging & Analytics:** Integrate with Sentry, Firebase Crashlytics, or similar for production monitoring.
+- **Logging & Analytics:** Integrate with Sentry or similar for production monitoring.
 - **Health Checks:** Periodic checks for BLE, network, and backend connectivity.
 
 ## Safety & Edge Cases
