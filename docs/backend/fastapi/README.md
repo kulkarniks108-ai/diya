@@ -27,10 +27,11 @@ It is written to support the Flutter app through stable API contracts, reliable 
 The backend should stay reliable for safety-first flows.
 
 - Flutter remains backend-neutral through repository and datasource adapters.
-- FastAPI owns provider orchestration for auth, AI, realtime, and safety workflows.
+- FastAPI owns auth, AI orchestration, realtime delivery, and safety workflows.
 - Active clients receive websocket updates.
 - Inactive clients receive push notifications for critical events.
 - Safety actions must remain idempotent and recoverable.
+- Optional delivery or monitoring utilities stay isolated from the core backend model.
 
 ## Cross References
 
