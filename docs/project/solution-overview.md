@@ -109,7 +109,7 @@ The module feeds the same analysis pipeline and supports automatic fallback if o
 - Mobile app: cross-platform implementation with production target on Flutter
 - Runtime model: background-first assistant with one-time setup, automatic reconnect, and persistent device orchestration where the OS allows it
 - AI pipeline: hybrid on-device and cloud-supported inference
-- Backend: Firebase and Google Cloud aligned architecture for identity, messaging, and real-time updates
+- Backend: FastAPI-centered architecture for identity, messaging, realtime updates, and domain workflows, with optional narrow utility services for push delivery when needed
 - Edge and accessories: ESP32-based and accessory-agnostic integration model
 
 ## AI Analysis Path
