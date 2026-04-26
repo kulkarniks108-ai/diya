@@ -1,7 +1,7 @@
 # Flutter Documentation (Production Plan)
 
 This folder defines the production Flutter approach for 2ndEye.
-It is written as an enterprise-ready blueprint with backend-neutral contracts (Firebase now, FastAPI-ready later).
+It is written as an enterprise-ready blueprint with FastAPI-first backend contracts and optional external utility integrations where needed.
 
 ## Scope
 
@@ -33,6 +33,7 @@ The Flutter app should behave like a control center that becomes quiet after set
 - Background services should keep critical device sessions alive whenever the platform allows it.
 - User prompts should be reserved for setup, exceptions, and recovery situations that need confirmation.
 - Flutter should keep safety writes queued locally until the backend confirms them.
+- FastAPI should remain the source of truth for auth, data, and safety state.
 
 ## Cross-References
 
