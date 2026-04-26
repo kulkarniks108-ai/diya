@@ -46,7 +46,8 @@ Design goal:
 ## Backend and Cloud Services Layer
 
 Direction:
-- Firebase plus Google Cloud services
+- FastAPI backend service for identity, safety workflows, realtime state, and API processing
+- Optional narrow utility services only where necessary, such as push notification delivery or monitoring helpers
 
 Core backend responsibilities:
 - Authentication and role management
@@ -57,6 +58,7 @@ Core backend responsibilities:
 Architecture intent:
 - Keep safety-critical paths clear and observable
 - Support long-term multi-device and multi-role expansion
+- Keep the backend stack simple with one primary backend service
 
 ## IoT and Edge Layer
 

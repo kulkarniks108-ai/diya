@@ -25,6 +25,7 @@ The platform is designed to work across three operating modes:
 3. Expanded multi-device mode
 - Multiple accessories connected simultaneously
 - Auto-managed reconnection and coordinated event handling
+- Background service keeps routine device state and telemetry synchronized after setup
 
 ## User Flow (Blind + Family)
 
@@ -93,6 +94,7 @@ The module feeds the same analysis pipeline and supports automatic fallback if o
 2. Low-friction operation
 - Daily operation should require minimal manual intervention after setup
 - System should recover from failures automatically whenever possible
+- Routine device handling should be background-driven instead of screen-driven
 
 3. Modular upgrade path
 - Users should be able to start small and add capability over time
@@ -105,8 +107,9 @@ The module feeds the same analysis pipeline and supports automatic fallback if o
 ## Technical Direction
 
 - Mobile app: cross-platform implementation with production target on Flutter
+- Runtime model: background-first assistant with one-time setup, automatic reconnect, and persistent device orchestration where the OS allows it
 - AI pipeline: hybrid on-device and cloud-supported inference
-- Backend: Firebase and Google Cloud aligned architecture for identity, messaging, and real-time updates
+- Backend: FastAPI-centered architecture for identity, messaging, realtime updates, and domain workflows, with optional narrow utility services for push delivery when needed
 - Edge and accessories: ESP32-based and accessory-agnostic integration model
 
 ## AI Analysis Path
