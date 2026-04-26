@@ -12,6 +12,7 @@ This document outlines strategies for ensuring reliability, safety, and robust r
 - **State Restoration:** Persist critical state to recover from app restarts or crashes without forcing a full re-setup.
 - **Foreground Service:** For Android, leverage foreground services for persistent connections and health monitoring when the OS requires visible execution.
 - **Setup Once, Run Quietly:** After initial pairing and permissions, keep the runtime mostly autonomous unless a safety decision needs the user.
+- **Queued Recovery:** When network access returns, queued safety writes and delivery confirmations should sync automatically.
 
 ## Error Handling & Observability
 - **Centralized Error Handling:** Catch and report errors globally; surface actionable feedback to users.
@@ -22,6 +23,7 @@ This document outlines strategies for ensuring reliability, safety, and robust r
 - **Automatic Recovery:** Retry failed operations, auto-reconnect BLE/Wi-Fi/USB sessions, and restore device context.
 - **User Prompts:** Notify users of critical failures and guide recovery steps, but avoid asking for confirmation on every transient reconnect.
 - **Fail-Safe Defaults:** Ensure safe fallback behaviors for all critical flows.
+- **Notification Handling:** If the app is terminated, push notifications remain the path for critical family alerts and backend recovery still continues.
 
 ## Reliability Targets
 - Connection recovery should be deterministic, bounded, and observable.
