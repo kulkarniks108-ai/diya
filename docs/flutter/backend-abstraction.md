@@ -1,30 +1,29 @@
 # Backend Abstraction
 
-This document describes the backend abstraction strategy for the Flutter app, enabling seamless switching between backend providers while keeping Flutter backend-neutral.
+This document describes how the Flutter app talks to the FastAPI backend without coupling feature code to transport details.
 
 ## Repository Pattern
 - **Domain-Driven:** Business logic interacts only with repositories, not with backend-specific code.
 - **Testability:** Repositories can be mocked for unit testing.
-- **Flexibility:** Swap backend implementations without changing business logic.
+- **FastAPI-Aligned:** Repository implementations target FastAPI contracts and keep feature code stable.
 
-## Adapter Layer
-- **Backend Adapters:** Each backend (Firebase, REST, etc.) has its own adapter implementing repository interfaces.
-- **Dependency Injection:** Adapters are injected at runtime, supporting environment-based configuration.
-- **Migration Ready:** Enables gradual migration or multi-backend support.
-- **FastAPI Adapter:** The FastAPI adapter owns token refresh, error normalization, retry boundaries, and offline queue sync behavior for the Flutter app.
+## Integration Layer
+- **FastAPI Repositories:** Repositories implement the app-facing interfaces and call FastAPI endpoints.
+- **Dependency Injection:** Repositories and service clients are injected at runtime, supporting environment-based configuration.
+- **Optional Service Clients:** Narrow integrations such as push delivery can live behind small isolated clients when needed.
+- **Sync Boundaries:** The FastAPI layer owns token refresh, error normalization, retry boundaries, and offline queue sync behavior for the Flutter app.
 
 ## Example
 ```
 abstract class AuthRepository { ... }
 
-class FirebaseAuthAdapter implements AuthRepository { ... }
-class FastApiAuthAdapter implements AuthRepository { ... }
+class FastApiAuthRepository implements AuthRepository { ... }
 ```
 
 ## Why This Matters
-- **Future-Proof:** Easily adopt new backends or migrate as requirements evolve.
+- **Single Backend Contract:** The app stays aligned to one backend model instead of a generic swapper.
 - **Maintainable:** Clear separation of concerns and minimal code duplication.
-- **Enterprise-Ready:** Supports scaling, testing, and integration with multiple systems.
+- **Enterprise-Ready:** Supports scaling, testing, and integration with the FastAPI backend.
 - **Safe Sync Model:** Local state can queue safety actions and reconcile with backend truth after reconnect.
 
 ---
