@@ -13,24 +13,24 @@ This document maps the current Expo MVP features to their planned Flutter equiva
 
 ## Flutter Migration Plan
 - **BLE:** Use flutter_blue_plus or similar, with background/foreground reliability
-- **AI:** Integrate OpenAI/Gemini via Dio, abstracted via repository pattern
+- **AI:** Integrate OpenAI/Gemini via Dio, abstracted through FastAPI-backed repositories
 - **State Management:** Riverpod (global and feature-scoped)
 - **Navigation:** go_router (declarative, deep linking)
-- **Notifications:** firebase_messaging/local_notifications, background-safe
+- **Notifications:** Push provider plus local notifications, background-safe
 - **Hardware Triggers:** Platform channels for accessory support, modular adapters
 - **Voice & Accessibility:** Use TTS/STT plugins, accessibility APIs, haptic feedback
 
 ## Migration Priorities
 1. BLE and hardware reliability (background/foreground)
 2. State management and navigation
-3. AI and backend abstraction
+3. AI and backend integration
 4. Notifications and observability
 5. Accessibility and user flows
 
 ## Known Gaps & Considerations
 - **BLE background support:** More complex in Flutter; requires platform-specific code
 - **AI SDKs:** May need custom wrappers for Gemini/OpenAI
-- **Multi-accessory:** Modular adapter pattern needed
+- **Multi-accessory:** Modular device orchestration still needed
 - **Testing:** More robust unit/integration tests planned
 
 ---
