@@ -21,7 +21,8 @@ It is written as an enterprise-ready blueprint with backend-neutral contracts (F
 4. [runtime-reliability.md](runtime-reliability.md)
 5. [backend-abstraction.md](backend-abstraction.md)
 6. [device-orchestration.md](device-orchestration.md)
-7. [migration-mapping.md](migration-mapping.md)
+7. [fastapi-integration.md](fastapi-integration.md)
+8. [migration-mapping.md](migration-mapping.md)
 
 ## Working Principle
 
@@ -31,6 +32,7 @@ The Flutter app should behave like a control center that becomes quiet after set
 - After setup, the app should prefer automated recovery over repeated user intervention.
 - Background services should keep critical device sessions alive whenever the platform allows it.
 - User prompts should be reserved for setup, exceptions, and recovery situations that need confirmation.
+- Flutter should keep safety writes queued locally until the backend confirms them.
 
 ## Cross-References
 
