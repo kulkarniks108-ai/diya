@@ -13,11 +13,13 @@ This document details the core technology stack and runtime strategies for the F
 - **Observability:** Integrated logging, error reporting, and analytics for production monitoring.
 - **Resilience:** Automatic reconnection, retry logic, and state restoration for critical flows.
 - **Background-First Design:** The stack should support one-time setup followed by mostly autonomous runtime behavior.
+- **Backend Contract Handling:** Dio interceptors should attach access tokens, refresh on expiry, and map backend errors into a shared domain failure shape.
 
 ## Backend-Neutral Adapters
 - **Repository Pattern:** Abstracts data sources, enabling easy backend swaps (Firebase, REST, FastAPI, etc.).
 - **Adapters:** Each backend (Firebase, REST, etc.) has its own adapter, keeping business logic agnostic.
 - **Dependency Injection:** Ensures testability and modularity.
+- **Sync Behavior:** Safety-critical writes should use idempotency keys and local retry queues.
 
 ## Why This Stack?
 - **Performance:** Optimized for mobile, with proven reliability in production apps.
