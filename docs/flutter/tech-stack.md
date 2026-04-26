@@ -15,9 +15,9 @@ This document details the core technology stack and runtime strategies for the F
 - **Background-First Design:** The stack should support one-time setup followed by mostly autonomous runtime behavior.
 - **Backend Contract Handling:** Dio interceptors should attach access tokens, refresh on expiry, and map backend errors into a shared domain failure shape.
 
-## Backend-Neutral Adapters
-- **Repository Pattern:** Abstracts data sources, enabling easy backend swaps (Firebase, REST, FastAPI, etc.).
-- **Adapters:** Each backend (Firebase, REST, etc.) has its own adapter, keeping business logic agnostic.
+## Backend Integration
+- **FastAPI Repositories:** The app talks to FastAPI through repository implementations instead of a generic backend swapper.
+- **Optional Service Clients:** Narrow clients can be used for push delivery or monitoring helpers when needed.
 - **Dependency Injection:** Ensures testability and modularity.
 - **Sync Behavior:** Safety-critical writes should use idempotency keys and local retry queues.
 
