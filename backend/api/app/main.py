@@ -1,7 +1,8 @@
 from fastapi import FastAPI
+from app.config.settings import settings
 
-app = FastAPI()
+app = FastAPI(title=settings.app_name)
 
 @app.get("/")
 def root():
-    return {"message": "API is running"}
+    return {"message": settings.app_name}
