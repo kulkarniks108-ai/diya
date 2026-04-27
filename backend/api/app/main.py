@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.config.settings import settings
+from app.config.security import create_access_token
 from app.config.logging import setup_logging
 import logging
 
@@ -13,3 +14,7 @@ app = FastAPI(title=settings.app_name)
 def root():
     logger.info("Root endpoint called")
     return {"message": settings.app_name}
+
+@app.get("/token")
+def test_token():
+    return {"token": create_access_token({"user_id": 1})}
