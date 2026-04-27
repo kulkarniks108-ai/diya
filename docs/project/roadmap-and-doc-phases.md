@@ -31,7 +31,7 @@ Planned focus:
 - BLE and hardware event implementation details
 - Current failure modes and empirical constraints
 
-## Phase 3 (Future): docs/flutter
+## Phase 3 (Current): docs/flutter
 
 Goal:
 - Define production implementation architecture and delivery plan for Flutter
@@ -41,6 +41,21 @@ Planned focus:
 - Runtime reliability and background execution strategy
 - Multi-accessory orchestration and reconnection engine design
 - Enterprise hardening controls and rollout planning
+
+Status note:
+- Baseline Flutter planning docs are implemented and actively maintained.
+
+## Phase 4 (Current): docs/backend/fastapi
+
+Goal:
+- Define enterprise FastAPI architecture standards and production contracts for Flutter integration.
+
+Current focus:
+- Route-controller-service-repository architecture standards
+- Casbin RBAC policy model with granular endpoint actions
+- Centralized config and environment policy
+- Error catalog with hierarchical codes and clear API envelope
+- Observability baseline with structured logging, tracing, and metrics
 
 ## Delivery Sequencing Intent
 
@@ -64,6 +79,9 @@ M2: Expo behavior contract docs complete
 M3: Flutter production docs complete
 - Reader can execute implementation with clear priorities and constraints
 
+M4: FastAPI enterprise docs complete
+- Reader can implement backend modules with consistent architecture, error handling, policy enforcement, and observability standards
+
 ## Non-Negotiables Across Phases
 
 - No event-specific framing
@@ -75,4 +93,4 @@ M3: Flutter production docs complete
 
 1. Review and tighten docs/project language for stakeholder alignment
 2. Start docs/expo extraction from source and behavior traces
-3. Start docs/flutter production mapping after Expo reference docs stabilize
+3. Continue docs/flutter and docs/backend/fastapi contract hardening for implementation readiness

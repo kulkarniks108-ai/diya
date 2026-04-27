@@ -54,6 +54,13 @@ This document defines how the Flutter app integrates with the FastAPI backend wh
 - Retry only safe operations automatically
 - Surface user actionable failures clearly
 
+## Contract Alignment Rules
+
+- Flutter error mapping should use hierarchical backend error codes
+- Flutter should preserve and surface trace_id for support and diagnostics
+- Response parsing should expect a single success and error envelope format across modules
+- Authorization failures should map cleanly to role or permission UX paths without exposing backend policy internals
+
 ---
 
-**Next:** See [backend-abstraction.md](backend-abstraction.md) for the repository and adapter contract model.
+**Next:** See [backend-abstraction.md](backend-abstraction.md) for the repository and adapter contract model and [../backend/fastapi/error-catalog-and-handling.md](../backend/fastapi/error-catalog-and-handling.md) for backend error semantics.
