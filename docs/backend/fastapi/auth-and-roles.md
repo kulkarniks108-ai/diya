@@ -39,6 +39,39 @@ This document defines the FastAPI identity and authorization model for 2ndEye.
 - Protected endpoints must verify role claims explicitly
 - Access control should be enforced in the backend, not only in Flutter
 
+## RBAC Model
+
+The backend should use Casbin with endpoint-style actions.
+
+### Action Pattern
+- resource:action format
+- Examples: user:create, user:read, safety:sos_trigger, safety:sos_resolve, device:register, location:update
+
+### Subject Model
+- Subjects represent role assignments and scoped identities
+- Roles include blind_user, family_user, admin_ops
+- Role bindings are resolved before endpoint and service execution
+
+### Enforcement Points
+- Route-level enforcement for coarse access control
+- Service-level enforcement for domain-conditional authorization
+- Repository layer should never perform RBAC checks
+
+## JWT Claim Baseline
+
+- sub for identity
+- role for primary role
+- permissions as optional explicit grants
+- session_id for revocation and audit correlation
+- token_version for forced invalidation workflows
+
+## Token Lifecycle
+
+- Access token short TTL
+- Refresh token longer TTL with rotation
+- Revocation list support by session_id and token identifier
+- Refresh replay detection with immediate invalidation on violation
+
 ---
 
 **Next:** See [realtime-and-notifications.md](realtime-and-notifications.md) for event delivery planning.
