@@ -16,6 +16,24 @@ This document defines operational and observability expectations for the FastAPI
 - Redaction for personal and sensitive data
 - Event logs for delivery and device health transitions
 
+### Logging Format Policy
+- Development: pretty human-readable logs for local debugging
+- Production: JSON structured logs for ingestion and query
+
+### Required Log Fields
+- trace_id
+- request_id
+- user_id when available
+- module
+- operation
+- result_status
+- error_code when failures occur
+
+### Redaction Policy
+- PII and secrets must be removed before log write
+- Location data must be partially masked in operational logs
+- Full precision location should only appear in tightly controlled audit channels
+
 ## Metrics
 
 - SOS fanout latency
@@ -23,6 +41,11 @@ This document defines operational and observability expectations for the FastAPI
 - WebSocket reconnect latency
 - Retry counts by endpoint
 - Error rate by service and route
+
+### Tracing and Metrics Baseline
+- OpenTelemetry trace instrumentation for REST, websocket, repository, and provider calls
+- Prometheus metrics for latency, throughput, error rate, and retry volume
+- Trace and metric labels should align with module and operation names
 
 ## Failure Handling
 
@@ -39,6 +62,12 @@ This document defines operational and observability expectations for the FastAPI
 - WebSocket disconnect loops
 - AI provider failures
 - Device telemetry backlog
+
+## Backend Terminal Behavior
+
+- Backend terminal output in development should show pretty logs with trace and error code context
+- Production runtime should emit JSON logs only
+- Every returned API error must have a matching backend log entry that includes the same trace_id
 
 ---
 
