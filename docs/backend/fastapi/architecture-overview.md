@@ -15,6 +15,13 @@ This document describes the FastAPI backend architecture for 2ndEye.
 - FastAPI routes expose versioned REST endpoints
 - WebSocket endpoints handle active realtime sessions
 - Request validation uses explicit schema models
+- Route handlers delegate to controllers only
+
+### Controller Layer
+- Orchestrates request and response mapping
+- Calls service methods and translates domain outcomes into API envelopes
+- Converts domain and technical errors into standardized HTTP responses
+- Must not contain persistence logic
 
 ### Domain Layer
 - Auth and roles
@@ -22,6 +29,18 @@ This document describes the FastAPI backend architecture for 2ndEye.
 - Live location and family notifications
 - Device state and telemetry handling
 - AI orchestration and result normalization
+
+### Service Layer
+- Implements business rules and workflow transitions
+- Enforces policy checks where domain context is required
+- Coordinates idempotency, transaction boundaries, and side effect sequencing
+- Calls repository interfaces, never concrete infrastructure classes
+
+### Repository Layer
+- Defines data access interfaces per module
+- Provides concrete adapters for SQLAlchemy async and PostgreSQL
+- Handles query, persistence, and transaction participation only
+- Must not contain domain workflow logic
 
 ### Infrastructure Layer
 - Database access
@@ -32,10 +51,20 @@ This document describes the FastAPI backend architecture for 2ndEye.
 
 ## Dependency Direction
 
-- Routes depend on services and schemas
-- Services depend on domain interfaces
-- Infrastructure implements domain interfaces
+- Routes depend on controllers and schemas
+- Controllers depend on services and response contracts
+- Services depend on repository and policy interfaces
+- Repository adapters depend on infrastructure clients
+- Infrastructure implements repository and provider interfaces
 - Flutter depends only on contracts, not backend internals
+
+## Layer Anti-Patterns
+
+- Route calling repositories directly
+- Controller performing business validation and state transitions
+- Service constructing HTTP responses or status codes
+- Repository making authorization or policy decisions
+- Shared utility modules holding module-specific business rules
 
 ## Service Boundaries
 
@@ -52,6 +81,17 @@ This document describes the FastAPI backend architecture for 2ndEye.
 - Prefer explicit state transitions over implicit side effects
 - Make failure states observable
 - Keep backend behavior compatible with offline Flutter retries
+
+## Module Template Standard
+
+Each module should define:
+- route definitions and websocket handlers where needed
+- controller for API orchestration
+- service for business logic
+- repository interfaces and concrete adapters
+- schemas and response contracts
+- domain errors and status enums
+- module tests for service, repository adapter, and API contract behavior
 
 ---
 
