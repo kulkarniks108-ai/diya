@@ -12,6 +12,7 @@ It is written as an enterprise-ready blueprint with FastAPI-first backend contra
 - Background-first device orchestration and reconnect behavior
 - Data contracts and backend adapters
 - Migration plan from Expo MVP
+- Flutter execution roadmap for enterprise release planning
 
 ## Reading Order
 
@@ -22,11 +23,12 @@ It is written as an enterprise-ready blueprint with FastAPI-first backend contra
 5. [backend-abstraction.md](backend-abstraction.md)
 6. [device-orchestration.md](device-orchestration.md)
 7. [fastapi-integration.md](fastapi-integration.md)
-8. [migration-mapping.md](migration-mapping.md)
+8. [roadmap.md](roadmap.md)
+9. [migration-mapping.md](migration-mapping.md)
 
 ## Working Principle
 
-The Flutter app should behave like a control center that becomes quiet after setup and then keeps the system stable in the background.
+The Flutter app should behave like the product platform, not a demo port. Expo is reference-only, while Flutter is the production target that becomes quiet after setup and then keeps the system stable in the background.
 
 - One-time initial setup should register devices, permissions, and trusted contacts.
 - After setup, the app should prefer automated recovery over repeated user intervention.
@@ -34,6 +36,8 @@ The Flutter app should behave like a control center that becomes quiet after set
 - User prompts should be reserved for setup, exceptions, and recovery situations that need confirmation.
 - Flutter should keep safety writes queued locally until the backend confirms them.
 - FastAPI should remain the source of truth for auth, data, and safety state.
+- The first hardware release should treat the Smart Cane and Wi-Fi Smart Goggle as a simultaneous multi-device baseline, not a later enhancement.
+- Firebase should stay narrow and utility-focused, such as push delivery, rather than becoming the primary backend or identity system.
 
 ## Cross-References
 
