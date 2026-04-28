@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from app.schemas import AccessoryEventInput, ArbitrationRequest
-from app.services.accessory_arbitrator import AccessoryEventArbitrator
+from app.modules.accessory.service import AccessoryEventArbitrator
 
 
 def test_safety_event_wins_over_assist_event() -> None:
