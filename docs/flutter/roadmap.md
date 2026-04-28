@@ -124,6 +124,14 @@ Before coding starts, the team should review [phase-1-foundation-plan.md](phase-
 - test and review checkpoints
 - recovery and fallback behavior
 
+### Phase 1 Follow-Up Artifacts
+
+To keep Phase 1 reviewable and future-proof, the team should also review:
+
+- [phase-1-edge-case-audit.md](phase-1-edge-case-audit.md)
+- [phase-1-review-test-checklist.md](phase-1-review-test-checklist.md)
+- [phase-1-contract-drift-watchlist.md](phase-1-contract-drift-watchlist.md)
+
 ## Phase 2: Identity, Session, And Safety Core
 
 ### Phase 2 Objective

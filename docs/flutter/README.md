@@ -14,6 +14,7 @@ It is written as an enterprise-ready blueprint with FastAPI-first backend contra
 - Migration plan from Expo MVP
 - Flutter execution roadmap for enterprise release planning
 - Phase 1 foundation plan with edge cases and review checkpoints
+- Phase 1 follow-up docs for edge cases, drift, and testing
 
 ## Reading Order
 
@@ -26,7 +27,10 @@ It is written as an enterprise-ready blueprint with FastAPI-first backend contra
 7. [fastapi-integration.md](fastapi-integration.md)
 8. [roadmap.md](roadmap.md)
 9. [phase-1-foundation-plan.md](phase-1-foundation-plan.md)
-10. [migration-mapping.md](migration-mapping.md)
+10. [phase-1-edge-case-audit.md](phase-1-edge-case-audit.md)
+11. [phase-1-review-test-checklist.md](phase-1-review-test-checklist.md)
+12. [phase-1-contract-drift-watchlist.md](phase-1-contract-drift-watchlist.md)
+13. [migration-mapping.md](migration-mapping.md)
 
 ## Working Principle
 
