@@ -1,22 +1,47 @@
+import '../../../core/errors/app_error.dart';
+
 enum SafetyStatus { idle, triggered, sending, sent, failed }
 
 /// Represents a single SOS action with its current state and metadata.
 class SafetyState {
-  const SafetyState({
+  SafetyState({
     required this.status,
     this.triggeredAt,
-    this.lastError,
+    AppError? error,
+    String? lastError,
     this.attemptCount = 0,
     this.traceId,
     this.location,
-  });
+  }) : error = error ?? (lastError == null ? null : AppError.safety(lastError, retryable: true));
 
   final SafetyStatus status;
   final DateTime? triggeredAt;
-  final String? lastError;
+  final AppError? error;
   final int attemptCount;
-  final String? traceId; // For backend tracking
-  final String? location; // Snapshot of location at trigger time
+  final String? traceId;
+  final String? location;
+
+  String? get lastError => error?.message;
+
+  SafetyState copyWith({
+    SafetyStatus? status,
+    DateTime? triggeredAt,
+    AppError? error,
+    String? lastError,
+    int? attemptCount,
+    String? traceId,
+    String? location,
+  }) {
+    return SafetyState(
+      status: status ?? this.status,
+      triggeredAt: triggeredAt ?? this.triggeredAt,
+      error: error ?? this.error,
+      lastError: lastError,
+      attemptCount: attemptCount ?? this.attemptCount,
+      traceId: traceId ?? this.traceId,
+      location: location ?? this.location,
+    );
+  }
 
   /// Transition to triggered state
   SafetyState toTriggered(DateTime now) {
@@ -58,14 +83,17 @@ class SafetyState {
   }
 
   /// Transition to failed state
-  SafetyState toFailed(String error) {
+  SafetyState toFailed(Object error) {
     if (status != SafetyStatus.sending) {
       return this;
     }
+    final appError = error is AppError
+        ? error
+        : AppError.safety(error.toString(), retryable: true);
     return SafetyState(
       status: SafetyStatus.failed,
       triggeredAt: triggeredAt,
-      lastError: error,
+      error: appError,
       attemptCount: attemptCount + 1,
       location: location,
     );
@@ -73,7 +101,7 @@ class SafetyState {
 
   /// Allow retry from failed state
   SafetyState retry() {
-    if (status != SafetyStatus.failed) {
+    if (status != SafetyStatus.failed || !isRetryable) {
       return this;
     }
     return SafetyState(
@@ -86,8 +114,8 @@ class SafetyState {
 
   /// Reset to idle
   SafetyState reset() {
-    return const SafetyState(status: SafetyStatus.idle);
+    return SafetyState(status: SafetyStatus.idle);
   }
 
-  bool get isRetryable => status == SafetyStatus.failed && attemptCount < 3;
+  bool get isRetryable => status == SafetyStatus.failed && attemptCount < 3 && (error?.retryable ?? true);
 }

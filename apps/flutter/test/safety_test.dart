@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:diya_flutter/core/errors/app_error.dart';
 import 'package:diya_flutter/features/safety/models/safety_state.dart';
 import 'package:diya_flutter/features/safety/services/safety_service.dart';
 import 'package:diya_flutter/core/network/safety_api.dart';
@@ -17,7 +18,7 @@ class FakeSafetyApi extends SafetyApi {
     required String idempotencyKey,
   }) async {
     if (shouldFail) {
-      throw Exception('Network error');
+      throw AppError.network('Network error');
     }
     return SafetyEventResponse(
       eventId: 'evt-123',
@@ -62,7 +63,7 @@ class FakeQueueRepository extends QueueRepository {
 void main() {
   group('SafetyState transitions', () {
     test('idle -> triggered transitions', () {
-      var state = const SafetyState(status: SafetyStatus.idle);
+      var state = SafetyState(status: SafetyStatus.idle);
       final now = DateTime.now();
 
       state = state.toTriggered(now);
@@ -72,7 +73,7 @@ void main() {
     });
 
     test('triggered -> sending -> sent', () {
-      var state = const SafetyState(status: SafetyStatus.idle);
+      var state = SafetyState(status: SafetyStatus.idle);
       state = state.toTriggered(DateTime.now());
 
       state = state.toSending();
@@ -84,7 +85,7 @@ void main() {
     });
 
     test('sending -> failed allows retry', () {
-      var state = const SafetyState(status: SafetyStatus.idle);
+      var state = SafetyState(status: SafetyStatus.idle);
       state = state.toTriggered(DateTime.now());
       state = state.toSending();
 
@@ -121,7 +122,7 @@ void main() {
 
     test('invalid transitions are ignored', () {
       // Try to transition from idle -> sending (should fail)
-      var state = const SafetyState(status: SafetyStatus.idle);
+      var state = SafetyState(status: SafetyStatus.idle);
       final original = state;
 
       state = state.toSending();
@@ -348,6 +349,8 @@ void main() {
         createdAt: DateTime.now(),
         attempts: 1,
       );
+
+      await queue.enqueue(item);
 
       await service.retryQueuedSOS(queueItem: item, accessToken: 'token');
 
