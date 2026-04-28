@@ -31,7 +31,16 @@ class SessionRecord:
 
 class AuthService:
     def __init__(self) -> None:
-        self._users: dict[str, DemoUser] = {
+        self._users: dict[str, DemoUser] = {}
+        self._sessions_by_id: dict[str, SessionRecord] = {}
+        self._refresh_index: dict[str, str] = {}
+        self._demo_seeded = False
+
+    def seed_demo_users(self) -> None:
+        if self._demo_seeded:
+            return
+
+        self._users = {
             "blind@example.com": DemoUser(
                 id="user-blind-001",
                 email="blind@example.com",
@@ -45,8 +54,7 @@ class AuthService:
                 roles=["family"],
             ),
         }
-        self._sessions_by_id: dict[str, SessionRecord] = {}
-        self._refresh_index: dict[str, str] = {}
+        self._demo_seeded = True
 
     def login(self, request: LoginRequest) -> TokenPair:
         user = self._users.get(request.email)

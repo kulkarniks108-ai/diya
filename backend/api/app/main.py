@@ -19,6 +19,11 @@ security = HTTPBearer(auto_error=False)
 app = FastAPI(title=settings.app.app_name)
 
 
+@app.on_event("startup")
+def seed_demo_data() -> None:
+    auth_service.seed_demo_users()
+
+
 def get_bearer_token(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> str:
     if credentials is None:
         raise HTTPException(
