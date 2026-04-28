@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../errors/app_error.dart';
+import '../errors/app_error_mapper.dart';
 
 /// Response from creating a safety event (SOS).
 class SafetyEventResponse {
@@ -45,21 +47,25 @@ class SafetyApi {
     required Map<String, dynamic> payload,
     required String idempotencyKey,
   }) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/safety/events',
-      data: payload,
-      options: Options(
-        headers: <String, String>{
-          'Authorization': 'Bearer $accessToken',
-          'Idempotency-Key': idempotencyKey,
-        },
-      ),
-    );
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/safety/events',
+        data: payload,
+        options: Options(
+          headers: <String, String>{
+            'Authorization': 'Bearer $accessToken',
+            'Idempotency-Key': idempotencyKey,
+          },
+        ),
+      );
 
-    if (response.data == null) {
-      throw StateError('Empty safety response');
+      if (response.data == null) {
+        throw const AppError(type: AppErrorType.safety, message: 'Empty safety response');
+      }
+
+      return SafetyEventResponse.fromJson(response.data!);
+    } on Object catch (error) {
+      throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.safety);
     }
-
-    return SafetyEventResponse.fromJson(response.data!);
   }
 }

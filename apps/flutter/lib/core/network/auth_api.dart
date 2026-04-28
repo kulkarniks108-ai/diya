@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../errors/app_error.dart';
+import '../errors/app_error_mapper.dart';
 import '../session/auth_session.dart';
 
 class AuthApi {
@@ -18,34 +20,50 @@ class AuthApi {
   final Dio _dio;
 
   Future<AuthSession> login({required String email, required String password}) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/auth/login',
-      data: <String, Object?>{'email': email, 'password': password},
-    );
-    return _parseSession(response.data);
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/login',
+        data: <String, Object?>{'email': email, 'password': password},
+      );
+      return _parseSession(response.data);
+    } on Object catch (error) {
+      throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
+    }
   }
 
   Future<AuthSession> refresh({required AuthSession session}) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/auth/refresh',
-      data: <String, Object?>{'refresh_token': session.refreshToken},
-    );
-    return _parseSession(response.data);
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/refresh',
+        data: <String, Object?>{'refresh_token': session.refreshToken},
+      );
+      return _parseSession(response.data);
+    } on Object catch (error) {
+      throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
+    }
   }
 
   Future<void> logout({required String accessToken}) async {
-    await _dio.post<void>(
-      '/auth/logout',
-      options: Options(headers: <String, String>{'Authorization': 'Bearer $accessToken'}),
-    );
+    try {
+      await _dio.post<void>(
+        '/auth/logout',
+        options: Options(headers: <String, String>{'Authorization': 'Bearer $accessToken'}),
+      );
+    } on Object catch (error) {
+      throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
+    }
   }
 
   /// Validate the current access token by calling /auth/me. Throws on non-2xx.
   Future<void> me({required String accessToken}) async {
-    await _dio.get<void>(
-      '/auth/me',
-      options: Options(headers: <String, String>{'Authorization': 'Bearer $accessToken'}),
-    );
+    try {
+      await _dio.get<void>(
+        '/auth/me',
+        options: Options(headers: <String, String>{'Authorization': 'Bearer $accessToken'}),
+      );
+    } on Object catch (error) {
+      throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
+    }
   }
 
   AuthSession _parseSession(Map<String, dynamic>? data) {
