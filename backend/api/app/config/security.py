@@ -1,28 +1,38 @@
-from passlib.context import CryptContext
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
+
 from jose import jwt
-from datetime import datetime, timedelta
+from passlib.context import CryptContext
+
 from app.config.settings import settings
 
-# Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = settings.secret_key  # move to env later
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def _normalize_password(password: str) -> bytes:
+    return password.encode("utf-8")[:72]
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return pwd_context.hash(_normalize_password(password))
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(_normalize_password(plain_password), hashed_password)
 
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+def create_access_token(claims: dict, expires_minutes: int | None = None) -> str:
+    payload = claims.copy()
+    lifetime = expires_minutes or settings.auth.access_token_expire_minutes
+    payload.update(
+        {
+            "jti": payload.get("jti", str(uuid4())),
+            "iat": datetime.now(tz=UTC),
+            "exp": datetime.now(tz=UTC) + timedelta(minutes=lifetime),
+        }
+    )
+    return jwt.encode(payload, settings.auth.secret_key, algorithm=settings.auth.algorithm)
 
-    to_encode.update({"exp": expire})
 
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+def decode_access_token(token: str) -> dict:
+    return jwt.decode(token, settings.auth.secret_key, algorithms=[settings.auth.algorithm])
