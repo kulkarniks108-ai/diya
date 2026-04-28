@@ -2,41 +2,73 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import '../network/auth_api.dart';
 import 'auth_session.dart';
+import 'session_repository.dart';
+import 'secure_session_repository.dart';
 
 final authApiProvider = Provider<AuthApi>((ref) => AuthApi());
 
+final sessionRepositoryProvider = Provider<SessionRepository>((ref) => SecureSessionRepository());
+
 final sessionControllerProvider = ChangeNotifierProvider<SessionController>((ref) {
-  return SessionController(ref.read(authApiProvider));
+  return SessionController(ref.read(authApiProvider), ref.read(sessionRepositoryProvider));
 });
 
 class SessionController extends ChangeNotifier {
-  SessionController(this._authApi) {
+  SessionController(this._authApi, this._sessionRepository) {
     _bootstrap();
   }
 
   final AuthApi _authApi;
+  final SessionRepository _sessionRepository;
   SessionState _state = const SessionState.loading();
 
   SessionState get state => _state;
 
   Future<void> _bootstrap() async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = prefs.getString(AppConfig.sessionStorageKey);
+    final session = await _sessionRepository.load();
 
-    if (encoded == null || encoded.isEmpty) {
+    if (session == null) {
       _state = const SessionState(status: AuthStatus.unauthenticated);
       notifyListeners();
       return;
     }
 
-    final decoded = jsonDecode(encoded) as Map<String, dynamic>;
-    final session = AuthSession.fromJson(decoded.cast<String, Object?>());
-    _state = SessionState(status: AuthStatus.authenticated, session: session);
+    // We have a locally stored session; validate it with the backend.
+    _state = SessionState(status: AuthStatus.refreshing, session: session);
+    notifyListeners();
+
+    try {
+      // Try /auth/me to validate access token
+      await _authApi.me(accessToken: session.accessToken);
+      _state = SessionState(status: AuthStatus.authenticated, session: session);
+    } catch (e) {
+      // If me() fails with authentication, attempt refresh once
+      try {
+        final refreshed = await _authApi.refresh(session: session);
+        await _sessionRepository.save(refreshed);
+        // Validate refreshed tokens
+        await _authApi.me(accessToken: refreshed.accessToken);
+        _state = SessionState(status: AuthStatus.authenticated, session: refreshed);
+      } catch (refreshError) {
+        // Network errors should not immediately log the user out; treat specifically
+        if (refreshError is Exception && refreshError.toString().contains('DioException')) {
+          // Unable to validate due to network error — keep local session but mark as unauthenticated
+          _state = SessionState(status: AuthStatus.authenticated, session: session, errorMessage: 'Validation pending (offline)');
+        } else {
+          await _sessionRepository.clear();
+          _state = const SessionState(status: AuthStatus.unauthenticated);
+        }
+      }
+    }
+
     notifyListeners();
   }
 
@@ -46,7 +78,7 @@ class SessionController extends ChangeNotifier {
 
     try {
       final session = await _authApi.login(email: email, password: password);
-      await _persist(session);
+      await _sessionRepository.save(session);
       _state = SessionState(status: AuthStatus.authenticated, session: session);
     } catch (error) {
       _state = SessionState(
@@ -69,7 +101,7 @@ class SessionController extends ChangeNotifier {
 
     try {
       final refreshed = await _authApi.refresh(session: currentSession);
-      await _persist(refreshed);
+      await _sessionRepository.save(refreshed);
       _state = SessionState(status: AuthStatus.authenticated, session: refreshed);
     } catch (error) {
       _state = SessionState(
@@ -91,8 +123,7 @@ class SessionController extends ChangeNotifier {
       }
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(AppConfig.sessionStorageKey);
+    await _sessionRepository.clear();
     _state = const SessionState(status: AuthStatus.unauthenticated);
     notifyListeners();
   }
@@ -102,8 +133,5 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _persist(AuthSession session) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AppConfig.sessionStorageKey, jsonEncode(session.toJson()));
-  }
+  // Persist helper is no longer used directly; repository handles persistence
 }
