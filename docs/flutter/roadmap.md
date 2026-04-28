@@ -114,6 +114,16 @@ Set up the app structure so every feature can be built the same way.
 - The app can boot with no hidden manual setup steps.
 - Local persistence can survive app restart.
 
+### Phase 1 Review Path
+
+Before coding starts, the team should review [phase-1-foundation-plan.md](phase-1-foundation-plan.md) for:
+
+- feature scope boundaries
+- future edge cases that must remain open
+- app shell and navigation decisions
+- test and review checkpoints
+- recovery and fallback behavior
+
 ## Phase 2: Identity, Session, And Safety Core
 
 ### Phase 2 Objective
