@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/network/safety_api.dart';
-import '../../core/queue/queue_repository.dart';
-import '../../core/session/auth_session.dart';
+import '../../../core/errors/app_error.dart';
+import '../../../core/permissions/permission_manager.dart';
+import '../../../core/permissions/permission_manager_impl.dart';
+import '../../../core/network/safety_api.dart';
+import '../../../core/queue/queue_repository.dart';
 import '../models/safety_state.dart';
 import '../services/safety_service.dart';
 
@@ -11,6 +13,10 @@ import '../services/safety_service.dart';
 final safetyApiProvider = Provider<SafetyApi>((ref) => SafetyApi());
 
 final queueRepositoryProvider = Provider<QueueRepository>((ref) => QueueRepository());
+
+final permissionManagerProviderAlias = Provider<PermissionManager>((ref) {
+  return ref.read(permissionManagerProvider);
+});
 
 final safetyServiceProvider = Provider<SafetyService>((ref) {
   return SafetyService(
@@ -23,17 +29,19 @@ final safetyControllerProvider = ChangeNotifierProvider<SafetyController>((ref) 
   return SafetyController(
     ref.read(safetyServiceProvider),
     ref.read(queueRepositoryProvider),
+    ref.read(permissionManagerProviderAlias),
   );
 });
 
 /// Controller for managing safety/SOS state using Riverpod ChangeNotifier pattern.
 class SafetyController extends ChangeNotifier {
-  SafetyController(this._safetyService, this._queueRepository);
+  SafetyController(this._safetyService, this._queueRepository, this._permissionManager);
 
   final SafetyService _safetyService;
   final QueueRepository _queueRepository;
+  final PermissionManager _permissionManager;
 
-  SafetyState _state = const SafetyState(status: SafetyStatus.idle);
+  SafetyState _state = SafetyState(status: SafetyStatus.idle);
 
   SafetyState get state => _state;
 
@@ -45,6 +53,22 @@ class SafetyController extends ChangeNotifier {
   }) async {
     _state = _state.toTriggered(DateTime.now());
     notifyListeners();
+
+    final permission = await _permissionManager.request(AppPermission.location);
+    if (permission != AppPermissionStatus.granted) {
+      _state = SafetyState(
+        status: SafetyStatus.failed,
+        error: AppError.permission(
+          permission == AppPermissionStatus.permanentlyDenied
+              ? 'Location permission is permanently denied. Open settings to continue.'
+              : 'Location permission is required to send SOS.',
+          code: permission == AppPermissionStatus.permanentlyDenied ? 'PERMISSION_PERMANENTLY_DENIED' : 'PERMISSION_DENIED',
+          retryable: permission == AppPermissionStatus.denied,
+        ),
+      );
+      notifyListeners();
+      return;
+    }
 
     final newState = await _safetyService.triggerSOS(
       accessToken: accessToken,
@@ -85,13 +109,17 @@ class SafetyController extends ChangeNotifier {
   Future<void> processQueue(String accessToken) async {
     await _safetyService.processQueue(accessToken);
     // Reset state after processing
-    _state = const SafetyState(status: SafetyStatus.idle);
+    _state = SafetyState(status: SafetyStatus.idle);
     notifyListeners();
+  }
+
+  Future<void> openPermissionSettings() async {
+    await _permissionManager.openSettings();
   }
 
   /// Reset state to idle (e.g., after user dismisses SOS or after success).
   void reset() {
-    _state = const SafetyState(status: SafetyStatus.idle);
+    _state = SafetyState(status: SafetyStatus.idle);
     notifyListeners();
   }
 }

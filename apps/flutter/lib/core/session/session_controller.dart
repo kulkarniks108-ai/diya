@@ -1,13 +1,8 @@
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../config/app_config.dart';
+import '../errors/app_error.dart';
+import '../errors/app_error_mapper.dart';
 import '../network/auth_api.dart';
 import 'auth_session.dart';
 import 'session_repository.dart';
@@ -36,7 +31,7 @@ class SessionController extends ChangeNotifier {
     final session = await _sessionRepository.load();
 
     if (session == null) {
-      _state = const SessionState(status: AuthStatus.unauthenticated);
+      _state = SessionState(status: AuthStatus.unauthenticated);
       notifyListeners();
       return;
     }
@@ -46,25 +41,47 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Try /auth/me to validate access token
       await _authApi.me(accessToken: session.accessToken);
       _state = SessionState(status: AuthStatus.authenticated, session: session);
-    } catch (e) {
-      // If me() fails with authentication, attempt refresh once
+    } on AppError catch (error) {
+      if (error.type == AppErrorType.network) {
+        _state = SessionState(
+          status: AuthStatus.authenticated,
+          session: session,
+          error: error,
+        );
+      } else {
+        try {
+          final refreshed = await _authApi.refresh(session: session);
+          await _sessionRepository.save(refreshed);
+          await _authApi.me(accessToken: refreshed.accessToken);
+          _state = SessionState(status: AuthStatus.authenticated, session: refreshed);
+        } on AppError catch (refreshError) {
+          if (refreshError.type == AppErrorType.network) {
+            _state = SessionState(
+              status: AuthStatus.authenticated,
+              session: session,
+              error: refreshError,
+            );
+          } else {
+            await _sessionRepository.clear();
+            _state = SessionState(status: AuthStatus.unauthenticated, error: refreshError);
+          }
+        }
+      }
+    } catch (error) {
+      final appError = AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
       try {
         final refreshed = await _authApi.refresh(session: session);
         await _sessionRepository.save(refreshed);
-        // Validate refreshed tokens
         await _authApi.me(accessToken: refreshed.accessToken);
         _state = SessionState(status: AuthStatus.authenticated, session: refreshed);
-      } catch (refreshError) {
-        // Network errors should not immediately log the user out; treat specifically
-        if (refreshError is Exception && refreshError.toString().contains('DioException')) {
-          // Unable to validate due to network error — keep local session but mark as unauthenticated
-          _state = SessionState(status: AuthStatus.authenticated, session: session, errorMessage: 'Validation pending (offline)');
+      } on AppError catch (refreshError) {
+        if (refreshError.type == AppErrorType.network) {
+          _state = SessionState(status: AuthStatus.authenticated, session: session, error: refreshError);
         } else {
           await _sessionRepository.clear();
-          _state = const SessionState(status: AuthStatus.unauthenticated);
+          _state = SessionState(status: AuthStatus.unauthenticated, error: appError);
         }
       }
     }
@@ -73,18 +90,15 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> signIn({required String email, required String password}) async {
-    _state = _state.copyWith(status: AuthStatus.refreshing, errorMessage: null);
+    _state = SessionState(status: AuthStatus.refreshing, session: _state.session);
     notifyListeners();
 
     try {
       final session = await _authApi.login(email: email, password: password);
       await _sessionRepository.save(session);
       _state = SessionState(status: AuthStatus.authenticated, session: session);
-    } catch (error) {
-      _state = SessionState(
-        status: AuthStatus.error,
-        errorMessage: 'Login failed: $error',
-      );
+    } on AppError catch (error) {
+      _state = SessionState(status: AuthStatus.error, error: error);
     }
 
     notifyListeners();
@@ -96,18 +110,19 @@ class SessionController extends ChangeNotifier {
       return;
     }
 
-    _state = _state.copyWith(status: AuthStatus.refreshing, errorMessage: null);
+    _state = SessionState(status: AuthStatus.refreshing, session: currentSession);
     notifyListeners();
 
     try {
       final refreshed = await _authApi.refresh(session: currentSession);
       await _sessionRepository.save(refreshed);
       _state = SessionState(status: AuthStatus.authenticated, session: refreshed);
-    } catch (error) {
-      _state = SessionState(
-        status: AuthStatus.error,
-        errorMessage: 'Refresh failed: $error',
-      );
+    } on AppError catch (error) {
+      if (error.type == AppErrorType.network) {
+        _state = SessionState(status: AuthStatus.authenticated, session: currentSession, error: error);
+      } else {
+        _state = SessionState(status: AuthStatus.error, error: error);
+      }
     }
 
     notifyListeners();
@@ -124,7 +139,7 @@ class SessionController extends ChangeNotifier {
     }
 
     await _sessionRepository.clear();
-    _state = const SessionState(status: AuthStatus.unauthenticated);
+    _state = SessionState(status: AuthStatus.unauthenticated);
     notifyListeners();
   }
 

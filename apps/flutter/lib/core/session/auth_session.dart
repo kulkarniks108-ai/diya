@@ -1,3 +1,5 @@
+import '../errors/app_error.dart';
+
 enum AuthStatus { loading, unauthenticated, authenticated, refreshing, error }
 
 class AuthSession {
@@ -43,22 +45,25 @@ class AuthSession {
 }
 
 class SessionState {
-  const SessionState({
+  SessionState({
     required this.status,
     this.session,
-    this.errorMessage,
+    AppError? error,
+    String? errorMessage,
     this.lastArbitrationSummary,
-  });
+  }) : error = error ?? (errorMessage == null ? null : AppError.unknown(errorMessage));
 
   final AuthStatus status;
   final AuthSession? session;
-  final String? errorMessage;
+  final AppError? error;
   final String? lastArbitrationSummary;
+
+  String? get errorMessage => error?.message;
 
   const SessionState.loading()
       : status = AuthStatus.loading,
         session = null,
-        errorMessage = null,
+        error = null,
         lastArbitrationSummary = null;
 
   bool get isLoading => status == AuthStatus.loading;
@@ -67,13 +72,15 @@ class SessionState {
   SessionState copyWith({
     AuthStatus? status,
     AuthSession? session,
+    AppError? error,
     String? errorMessage,
     String? lastArbitrationSummary,
   }) {
     return SessionState(
       status: status ?? this.status,
       session: session ?? this.session,
-      errorMessage: errorMessage ?? this.errorMessage,
+      error: error ?? this.error,
+      errorMessage: errorMessage,
       lastArbitrationSummary: lastArbitrationSummary ?? this.lastArbitrationSummary,
     );
   }

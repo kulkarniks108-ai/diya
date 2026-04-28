@@ -1,9 +1,11 @@
 import 'package:uuid/uuid.dart';
 
-import '../../core/network/safety_api.dart';
-import '../../core/queue/queue_item.dart';
-import '../../core/queue/queue_repository.dart';
-import 'models/safety_state.dart';
+import '../../../core/errors/app_error.dart';
+import '../../../core/errors/app_error_mapper.dart';
+import '../../../core/network/safety_api.dart';
+import '../../../core/queue/queue_item.dart';
+import '../../../core/queue/queue_repository.dart';
+import '../models/safety_state.dart';
 
 /// Service layer for safety operations (SOS).
 /// Coordinates between API, persistence, and state management.
@@ -18,21 +20,14 @@ class SafetyService {
   final QueueRepository _queueRepository;
   static const _maxRetries = 3;
 
-  /// Trigger an SOS event with optional payload (location, timestamp, etc).
   Future<SafetyState> triggerSOS({
     required String accessToken,
     required String location,
   }) async {
-    var state = SafetyState(
-      status: SafetyStatus.idle,
-    ).toTriggered(DateTime.now());
-
-    // Move to sending state
-    state = state.copyWith(location: location) ?? state;
-    state = state.toSending();
+    var state = SafetyState(status: SafetyStatus.idle).toTriggered(DateTime.now());
+    state = state.copyWith(location: location).toSending();
 
     try {
-      // Attempt to send immediately
       final payload = <String, dynamic>{
         'location': location,
         'timestamp': DateTime.now().toIso8601String(),
@@ -45,31 +40,28 @@ class SafetyService {
         idempotencyKey: idempotencyKey,
       );
 
-      // Success: move to sent state
-      state = state.toSent(response.traceId);
+      return state.toSent(response.traceId);
+    } catch (error) {
+      final appError = AppErrorMapper.fromException(error, fallbackType: AppErrorType.safety);
+      final failedState = state.toFailed(appError);
 
-      return state;
-    } catch (e) {
-      // Failure: move to failed state and queue for retry
-      state = state.toFailed(e.toString());
+      if (appError.retryable) {
+        final queueItem = QueueItem(
+          id: const Uuid().v4(),
+          type: QueueItemType.sos,
+          payload: <String, dynamic>{
+            'location': location,
+            'timestamp': DateTime.now().toIso8601String(),
+          },
+          createdAt: DateTime.now(),
+        );
+        await _queueRepository.enqueue(queueItem);
+      }
 
-      // Store in queue for later retry
-      final queueItem = QueueItem(
-        id: const Uuid().v4(),
-        type: QueueItemType.sos,
-        payload: <String, dynamic>{
-          'location': location,
-          'timestamp': DateTime.now().toIso8601String(),
-        },
-        createdAt: DateTime.now(),
-      );
-      await _queueRepository.enqueue(queueItem);
-
-      return state;
+      return failedState;
     }
   }
 
-  /// Retry a queued SOS action.
   Future<SafetyState> retryQueuedSOS({
     required QueueItem queueItem,
     required String accessToken,
@@ -77,6 +69,7 @@ class SafetyService {
     var state = SafetyState(
       status: SafetyStatus.failed,
       attemptCount: queueItem.attempts,
+      error: AppError.safety('Queued SOS retry requested.', retryable: true),
     ).retry();
 
     try {
@@ -85,39 +78,31 @@ class SafetyService {
       final response = await _api.createSafetyEvent(
         accessToken: accessToken,
         payload: queueItem.payload,
-        idempotencyKey: queueItem.id, // Use queue item ID for idempotency
+        idempotencyKey: queueItem.id,
       );
 
-      // Success: update queue and move to sent
-      state = state.toSent(response.traceId);
       await _queueRepository.dequeue(queueItem.id);
+      return state.toSent(response.traceId);
+    } catch (error) {
+      final appError = AppErrorMapper.fromException(error, fallbackType: AppErrorType.safety);
 
-      return state;
-    } catch (e) {
-      // Failure: check if retryable
       queueItem.attempts++;
-      if (queueItem.attempts < _maxRetries) {
+      if (queueItem.attempts < _maxRetries && appError.retryable) {
         await _queueRepository.update(queueItem);
-        state = SafetyState(
-          status: SafetyStatus.failed,
-          lastError: e.toString(),
-          attemptCount: queueItem.attempts,
-        );
       } else {
-        // Max retries exceeded: remove from queue
         await _queueRepository.dequeue(queueItem.id);
-        state = SafetyState(
-          status: SafetyStatus.failed,
-          lastError: 'Max retries exceeded: $e',
-          attemptCount: queueItem.attempts,
-        );
       }
 
-      return state;
+      return SafetyState(
+        status: SafetyStatus.failed,
+        attemptCount: queueItem.attempts,
+        error: queueItem.attempts >= _maxRetries
+            ? AppError.safety('SOS retry limit reached.', code: 'SOS_MAX_RETRIES')
+            : appError,
+      );
     }
   }
 
-  /// Process all queued SOS items (called on app bootstrap).
   Future<void> processQueue(String accessToken) async {
     final queue = await _queueRepository.loadQueue();
     for (final item in queue) {
@@ -125,25 +110,5 @@ class SafetyService {
         await retryQueuedSOS(queueItem: item, accessToken: accessToken);
       }
     }
-  }
-}
-
-extension on SafetyState {
-  SafetyState? copyWith({
-    SafetyStatus? status,
-    DateTime? triggeredAt,
-    String? lastError,
-    int? attemptCount,
-    String? traceId,
-    String? location,
-  }) {
-    return SafetyState(
-      status: status ?? this.status,
-      triggeredAt: triggeredAt ?? this.triggeredAt,
-      lastError: lastError ?? this.lastError,
-      attemptCount: attemptCount ?? this.attemptCount,
-      traceId: traceId ?? this.traceId,
-      location: location ?? this.location,
-    );
   }
 }
