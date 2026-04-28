@@ -40,6 +40,14 @@ class AuthApi {
     );
   }
 
+  /// Validate the current access token by calling /auth/me. Throws on non-2xx.
+  Future<void> me({required String accessToken}) async {
+    await _dio.get<void>(
+      '/auth/me',
+      options: Options(headers: <String, String>{'Authorization': 'Bearer $accessToken'}),
+    );
+  }
+
   AuthSession _parseSession(Map<String, dynamic>? data) {
     if (data == null) {
       throw StateError('Empty auth response');
