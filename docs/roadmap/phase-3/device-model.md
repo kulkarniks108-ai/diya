@@ -9,6 +9,9 @@ The `BaseDevice` contract requires the following capability definitions:
 - `supportsAudio`: Can output audio or voice guidance.
 - `supportsButtons`: Provides physical interactive triggers.
 
+## DeviceCommand Support
+Devices are responsible for interpreting `DeviceCommand` payloads from the `DeviceManager`. A device will only receive commands that match its declared capabilities. If a `VibrateCommand` is dispatched to a device with `supportsHaptics: false`, the `DeviceManager` safely drops the command.
+
 ## Supported Devices (Phase 3 Baseline)
 
 ### 1. Smart Cane

@@ -6,28 +6,30 @@ Phase 3 will be executed incrementally. Core abstractions must be proven with un
 ## Milestones & Tasks
 
 ### Milestone 1: Abstraction & Core Routing
-1. **Define `BaseDevice` Interface:** Implement the core contract with capability flags (`supportsCamera`, `supportsHaptics`, etc.).
-2. **Implement `EventBus`:** Create the asynchronous Pub/Sub router. Add unit tests ensuring events are dispatched without blocking.
-3. **Implement `DeviceManager`:** Build the centralized connection state tracker.
+1. **Define `BaseDevice` & `DeviceCommand` Interfaces:** Create core contracts and capability flags (1 commit).
+2. **Implement `DeviceManager` State Ownership:** Build the singleton/provider that owns `ConnectionState` (1-2 commits).
+3. **Implement `EventBus` & `EventRouter`:** Build the async Pub/Sub and the routing layer that enforces priority (`SOS > Assist`) (2 commits).
 
 ### Milestone 2: Connection Resilience
-1. **Build State Machine:** Implement transitions (`idle` -> `connecting` -> `ready` -> `degraded` -> `reconnecting`).
-2. **Implement Backoff Strategy:** Add the exponential backoff logic (1s -> 30s cap) to the reconnect flow.
-3. **Write Failure Tests:** Simulate dropped connections and verify the `DeviceManager` recovers correctly without locking the main thread.
+1. **Build State Machine Engine:** Implement transitions (`idle` -> `connecting` -> `ready` -> `degraded` -> `reconnecting`) (1 commit).
+2. **Implement Backoff Strategy:** Add the 1s -> 30s cap exponential backoff logic (1 commit).
+3. **Background Resume Logic:** Add lifecycle observers to trigger fast-reconnect on app foregrounding (1 commit).
 
 ### Milestone 3: Device Adapters
-1. **`SmartCaneAdapter` (BLE):** Implement the `BleTransport` wrapper. Map physical button inputs to `ButtonPressEvent`s. Implement immediate local haptic ACK.
-2. **`SmartGoggleAdapter` (Wi-Fi):** Implement the `HttpTransport` wrapper. Build the command/response execution pattern with strict timeouts.
+1. **`SmartCaneAdapter` (BLE) - Handshake:** Implement connection and capability negotiation (1 commit).
+2. **`SmartCaneAdapter` (BLE) - Events:** Map physical inputs to `ButtonPressEvent`s with immediate haptic ACK (1-2 commits).
+3. **`SmartGoggleAdapter` (Wi-Fi):** Implement `HttpTransport` wrapper with strict timeouts for commands (2 commits).
 
 ### Milestone 4: Arbitration & Integration
-1. **Connect to Phase 2 Controllers:** Update `AssistController` and `SafetyController` to listen to the `EventBus`.
-2. **Implement Multi-Device Coordination:** Write the logic where `AssistController` requests an image from the Goggle based on a Cane trigger.
-3. **Deduplication Verification:** Ensure the 5-second deduplication logic correctly filters spam events across the bus.
+1. **Connect Phase 2 Controllers:** Hook `SafetyController` to the `EventRouter` for SOS deduplication (1 commit).
+2. **Implement `AssistSessionContext`:** Create the stateful context for multi-device actions (1-2 commits).
+3. **Multi-Device Flow:** Wire the `AssistController` to request an image from the Goggle based on a Cane trigger (2 commits).
 
 ### Milestone 5: UI & Debugging
-1. **Build Debug Screen:** Create the structured log UI component.
-2. **Build Device Status UI:** Expose battery and health states to the user.
-3. **Manual Overrides:** Implement UI controls for forced disconnection and retry.
+1. **Build Debug Screen Logic:** Implement structured log capture from `DeviceManager` and `EventBus` (1 commit).
+2. **Build Debug UI Component:** Create the visual log list and filter UI (1 commit).
+3. **Build Device Status UI:** Expose battery and health indicators on the main screen (1 commit).
+4. **Manual Overrides:** Implement UI buttons for disconnect/retry (1 commit).
 
 ## Dependencies
 - Phase 2 Safety Pipeline (Completed)
