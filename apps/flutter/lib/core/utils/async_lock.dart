@@ -1,3 +1,5 @@
+import 'dart:async';
+
 /// Simple async lock to prevent concurrent access to a resource.
 class AsyncLock {
   Future<void>? _lockFuture;

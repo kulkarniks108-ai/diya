@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 enum QueueItemType { sos }
 
 /// Represents a queued action (currently only SOS) awaiting retry.

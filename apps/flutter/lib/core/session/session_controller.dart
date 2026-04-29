@@ -9,18 +9,17 @@ import 'auth_session.dart';
 import 'session_repository.dart';
 import 'secure_session_repository.dart';
 
-final authApiProvider = Provider<AuthApi>((ref) {
-  final api = AuthApi();
-  final sessionController = ref.watch(sessionControllerProvider);
-  // Register the token expiry interceptor after creating the session controller
-  api.registerInterceptor(sessionController);
-  return api;
-});
+final authApiProvider = Provider<AuthApi>((ref) => AuthApi());
 
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) => SecureSessionRepository());
 
 final sessionControllerProvider = ChangeNotifierProvider<SessionController>((ref) {
-  return SessionController(ref.read(authApiProvider), ref.read(sessionRepositoryProvider));
+  final authApi = ref.read(authApiProvider);
+  final sessionRepository = ref.read(sessionRepositoryProvider);
+  final controller = SessionController(authApi, sessionRepository);
+  // Register the token expiry interceptor after session controller is created
+  authApi.registerInterceptor(controller);
+  return controller;
 });
 
 class SessionController extends ChangeNotifier {

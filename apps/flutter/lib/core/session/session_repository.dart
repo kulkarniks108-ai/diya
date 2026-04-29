@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import '../config/app_config.dart';
 import 'auth_session.dart';
 
 abstract class SessionRepository {
