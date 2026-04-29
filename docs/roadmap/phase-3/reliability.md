@@ -27,3 +27,19 @@ Phase 3 is built under the assumption that the physical environment is chaotic. 
 Any error encountered at the Transport or Adapter level must be wrapped in a strongly typed `HardwareErrorEvent` and placed on the EventBus.
 - Errors must contain: `deviceId`, `timestamp`, `errorCode`, and `message`.
 - This ensures the UI can present user-friendly error messages without embedding hardware try/catch blocks in the view layer.
+
+## Background Execution Clarification
+The system survives app minimization but does **not** rely on full background services in Phase 3.
+
+**What runs in the background:**
+- The `DeviceManager` connection state persists.
+- BLE sockets (if maintained natively by iOS/Android while the app is backgrounded).
+- The EventBus remains capable of receiving hardware events (e.g., if a Cane button is pressed while the phone is locked, native BLE layers may wake the app briefly to process it).
+
+**What does NOT run:**
+- Long-running polling loops or continuous network API streams.
+- The `HttpTransport` for the Wi-Fi Goggle may suspend aggressively when the app is minimized.
+
+**System Behavior on Minimize / Resume:**
+- **Minimize:** App stops visual updates. Connections are kept alive lazily. If a connection drops, backoff retry timers pause or slow down natively.
+- **Resume:** `DeviceManager` instantly triggers the `reconnecting` flow if devices were dropped while backgrounded. Any queued hardware events (if supported by native queues) are flushed to the `EventRouter`.
