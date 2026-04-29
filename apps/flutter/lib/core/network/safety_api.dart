@@ -40,17 +40,22 @@ class SafetyApi {
 
   final Dio _dio;
 
-  /// Create a safety event (SOS). 
+  /// Create a safety event (SOS).
   /// Accepts idempotency key to prevent duplicate processing.
   Future<SafetyEventResponse> createSafetyEvent({
     required String accessToken,
+    required String type,
     required Map<String, dynamic> payload,
     required String idempotencyKey,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/safety/events',
-        data: payload,
+        data: <String, dynamic>{
+          'type': type,
+          'payload': payload,
+          'idempotency_key': idempotencyKey,
+        },
         options: Options(
           headers: <String, String>{
             'Authorization': 'Bearer $accessToken',
