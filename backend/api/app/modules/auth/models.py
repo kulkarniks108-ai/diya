@@ -1,21 +1,36 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
 from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import JSON, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.base import Base
 
 
-@dataclass(slots=True)
-class DemoUser:
-    id: str
-    email: str
-    password_hash: str
-    roles: list[str]
+class User(Base):
+    """
+    User model for 2ndEye.
+
+    Roles: BLIND, FAMILY, ADMIN
+    """
+
+    __tablename__ = "users"
+
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    roles: Mapped[list[str]] = mapped_column(JSON, default=list)
 
 
-@dataclass(slots=True)
-class SessionRecord:
-    session_id: str
-    user_id: str
-    refresh_token: str
-    token_version: int
-    revoked_at: datetime | None = None
+class AuthSession(Base):
+    """
+    Tracks active user sessions and refresh tokens.
+
+    Supports rotation and revocation.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    user_id: Mapped[UUID] = mapped_column(index=True)
+    refresh_token: Mapped[str] = mapped_column(String(512), index=True)
+    token_version: Mapped[int] = mapped_column(default=1)
+    revoked_at: Mapped[datetime | None] = mapped_column(default=None)
