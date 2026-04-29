@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 import '../core/session/session_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/safety/providers/safety_bootstrap.dart';
 import '../features/startup/startup_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final sessionController = ref.watch(sessionControllerProvider);
+  // Watch the bootstrap provider to trigger queue processing on authentication
+  ref.watch(safetyBootstrapProvider);
 
   return GoRouter(
     initialLocation: '/',

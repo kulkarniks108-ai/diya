@@ -4,6 +4,7 @@ import '../config/app_config.dart';
 import '../errors/app_error.dart';
 import '../errors/app_error_mapper.dart';
 import '../session/auth_session.dart';
+import 'token_expiry_interceptor.dart';
 
 class AuthApi {
   AuthApi({Dio? dio})
@@ -18,6 +19,18 @@ class AuthApi {
             );
 
   final Dio _dio;
+  bool _interceptorRegistered = false;
+
+  /// Register the token expiry interceptor (called after session controller is available).
+  void registerInterceptor(dynamic sessionController) {
+    if (_interceptorRegistered) {
+      return;
+    }
+    _dio.interceptors.add(
+      TokenExpiryInterceptor(authApi: this, sessionController: sessionController),
+    );
+    _interceptorRegistered = true;
+  }
 
   Future<AuthSession> login({required String email, required String password}) async {
     try {
@@ -25,7 +38,7 @@ class AuthApi {
         '/auth/login',
         data: <String, Object?>{'email': email, 'password': password},
       );
-      return _parseSession(response.data);
+      return _parseSession(_extractData(response.data));
     } on Object catch (error) {
       throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
     }
@@ -37,7 +50,7 @@ class AuthApi {
         '/auth/refresh',
         data: <String, Object?>{'refresh_token': session.refreshToken},
       );
-      return _parseSession(response.data);
+      return _parseSession(_extractData(response.data));
     } on Object catch (error) {
       throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
     }
@@ -64,6 +77,14 @@ class AuthApi {
     } on Object catch (error) {
       throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
     }
+  }
+
+  /// Extract data from the response envelope {success, data, trace_id}
+  Map<String, dynamic>? _extractData(Map<String, dynamic>? envelope) {
+    if (envelope == null) {
+      return null;
+    }
+    return envelope['data'] as Map<String, dynamic>?;
   }
 
   AuthSession _parseSession(Map<String, dynamic>? data) {

@@ -63,7 +63,13 @@ class SafetyApi {
         throw const AppError(type: AppErrorType.safety, message: 'Empty safety response');
       }
 
-      return SafetyEventResponse.fromJson(response.data!);
+      // Extract data from envelope {success, data, trace_id}
+      final data = response.data!['data'] as Map<String, dynamic>?;
+      if (data == null) {
+        throw const AppError(type: AppErrorType.safety, message: 'Invalid safety response format');
+      }
+
+      return SafetyEventResponse.fromJson(data);
     } on Object catch (error) {
       throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.safety);
     }

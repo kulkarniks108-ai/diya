@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../errors/app_error.dart';
 import '../errors/app_error_mapper.dart';
 import '../network/auth_api.dart';
+import '../utils/async_lock.dart';
 import 'auth_session.dart';
 import 'session_repository.dart';
 import 'secure_session_repository.dart';
@@ -13,7 +14,12 @@ final authApiProvider = Provider<AuthApi>((ref) => AuthApi());
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) => SecureSessionRepository());
 
 final sessionControllerProvider = ChangeNotifierProvider<SessionController>((ref) {
-  return SessionController(ref.read(authApiProvider), ref.read(sessionRepositoryProvider));
+  final authApi = ref.read(authApiProvider);
+  final sessionRepository = ref.read(sessionRepositoryProvider);
+  final controller = SessionController(authApi, sessionRepository);
+  // Register the token expiry interceptor after session controller is created
+  authApi.registerInterceptor(controller);
+  return controller;
 });
 
 class SessionController extends ChangeNotifier {
@@ -23,6 +29,7 @@ class SessionController extends ChangeNotifier {
 
   final AuthApi _authApi;
   final SessionRepository _sessionRepository;
+  final AsyncLock _refreshLock = AsyncLock();
   SessionState _state = const SessionState.loading();
 
   SessionState get state => _state;
@@ -105,26 +112,35 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> refreshSession() async {
-    final currentSession = _state.session;
-    if (currentSession == null) {
-      return;
-    }
-
-    _state = SessionState(status: AuthStatus.refreshing, session: currentSession);
-    notifyListeners();
-
-    try {
-      final refreshed = await _authApi.refresh(session: currentSession);
-      await _sessionRepository.save(refreshed);
-      _state = SessionState(status: AuthStatus.authenticated, session: refreshed);
-    } on AppError catch (error) {
-      if (error.type == AppErrorType.network) {
-        _state = SessionState(status: AuthStatus.authenticated, session: currentSession, error: error);
-      } else {
-        _state = SessionState(status: AuthStatus.error, error: error);
+    return _refreshLock.acquire(() async {
+      final currentSession = _state.session;
+      if (currentSession == null) {
+        return;
       }
-    }
 
+      _state = SessionState(status: AuthStatus.refreshing, session: currentSession);
+      notifyListeners();
+
+      try {
+        final refreshed = await _authApi.refresh(session: currentSession);
+        await _sessionRepository.save(refreshed);
+        _state = SessionState(status: AuthStatus.authenticated, session: refreshed);
+      } on AppError catch (error) {
+        if (error.type == AppErrorType.network) {
+          _state = SessionState(status: AuthStatus.authenticated, session: currentSession, error: error);
+        } else {
+          _state = SessionState(status: AuthStatus.error, error: error);
+        }
+      }
+
+      notifyListeners();
+    });
+  }
+
+  /// Update the current session (used by interceptor for token refresh).
+  Future<void> updateSession(AuthSession newSession) async {
+    await _sessionRepository.save(newSession);
+    _state = SessionState(status: AuthStatus.authenticated, session: newSession);
     notifyListeners();
   }
 
