@@ -1,62 +1,48 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from jose import JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_bearer_token
 from app.config.security import decode_access_token
+from app.db.session import get_db
+from app.schemas import SafetyEventCreateRequest
 
-from .repository import InMemorySafetyEventRepository
+from .repository import SqlAlchemySafetyEventRepository
 from .service import SafetyEventService
-
-# Global repository and service instances
-_repository = InMemorySafetyEventRepository()
-safety_service = SafetyEventService(_repository)
 
 router = APIRouter(prefix="/safety", tags=["safety"])
 
 
-class SafetyEventRequest:
-    """Request model for creating a safety event."""
-
-    def __init__(self, type: str, payload: dict):
-        self.type = type
-        self.payload = payload
-
-
-class SafetyEventCreateResponse:
-    """Response model for creating a safety event."""
-
-    def __init__(self, id: str, trace_id: str, timestamp: str):
-        self.id = id
-        self.trace_id = trace_id
-        self.timestamp = timestamp
-
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "trace_id": self.trace_id,
-            "timestamp": self.timestamp,
-        }
+async def get_safety_service(db: AsyncSession = Depends(get_db)) -> SafetyEventService:
+    """Dependency for getting the SafetyEventService with the current DB session."""
+    repository = SqlAlchemySafetyEventRepository(db)
+    return SafetyEventService(repository)
 
 
 @router.post("/events")
-def create_safety_event(
-    type: str,
-    payload: dict,
+async def create_safety_event(
+    request: SafetyEventCreateRequest,
     token: str = Depends(get_bearer_token),
     idempotency_key: str | None = Header(default=None),
+    safety_service: SafetyEventService = Depends(get_safety_service),
 ) -> dict:
     """
     Create a safety event (e.g., SOS).
 
     Requires:
     - Authorization header with valid access token
-    - Idempotency-Key header (for idempotent processing)
+    - Idempotency-Key header or idempotency_key in body
 
     Returns:
     - {success: true, data: {id, trace_id, timestamp}, trace_id}
     """
+    # Use idempotency key from body if not in header
+    effective_idempotency_key = idempotency_key or request.idempotency_key
+
     # Decode token to get user_id
     try:
         payload_decoded = decode_access_token(token)
@@ -74,18 +60,20 @@ def create_safety_event(
         )
 
     # Create safety event
-    event = safety_service.create_safety_event(
+    trace_id = str(uuid4())
+    event = await safety_service.create_safety_event(
         user_id=user_id,
-        event_type=type,
-        payload=payload,
-        idempotency_key=idempotency_key,
+        event_type=request.type,
+        payload=request.payload,
+        trace_id=trace_id,
+        idempotency_key=effective_idempotency_key,
     )
 
     # Return success response with envelope
     return {
         "success": True,
         "data": {
-            "id": event.id,
+            "id": str(event.id),
             "trace_id": event.trace_id,
             "timestamp": event.created_at.isoformat(),
         },

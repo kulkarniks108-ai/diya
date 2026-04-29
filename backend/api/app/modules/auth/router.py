@@ -1,18 +1,31 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_bearer_token
-from app.schemas import LoginRequest, LogoutRequest, MeResponse, RefreshRequest, TokenPair
+from app.db.session import get_db
+from app.schemas import LoginRequest, LogoutRequest, RefreshRequest
 
-from .service import auth_service
+from .repository import SqlAlchemyAuthRepository
+from .service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+async def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
+    """Dependency for getting the AuthService with the current DB session."""
+    repository = SqlAlchemyAuthRepository(db)
+    return AuthService(repository)
+
+
 @router.post("/login")
-def login(request: LoginRequest, x_trace_id: str | None = Header(default=None)) -> dict:
-    token_pair = auth_service.login(request)
+async def login(
+    request: LoginRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+    x_trace_id: str | None = Header(default=None),
+) -> dict:
+    token_pair = await auth_service.login(request)
     return {
         "success": True,
         "data": {
@@ -32,8 +45,12 @@ def login(request: LoginRequest, x_trace_id: str | None = Header(default=None)) 
 
 
 @router.post("/refresh")
-def refresh(request: RefreshRequest, x_trace_id: str | None = Header(default=None)) -> dict:
-    token_pair = auth_service.refresh(request)
+async def refresh(
+    request: RefreshRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+    x_trace_id: str | None = Header(default=None),
+) -> dict:
+    token_pair = await auth_service.refresh(request)
     return {
         "success": True,
         "data": {
@@ -53,8 +70,13 @@ def refresh(request: RefreshRequest, x_trace_id: str | None = Header(default=Non
 
 
 @router.post("/logout")
-def logout(request: LogoutRequest | None = None, token: str = Depends(get_bearer_token), x_trace_id: str | None = Header(default=None)) -> dict:
-    auth_service.logout(request, token)
+async def logout(
+    request: LogoutRequest | None = None,
+    token: str = Depends(get_bearer_token),
+    auth_service: AuthService = Depends(get_auth_service),
+    x_trace_id: str | None = Header(default=None),
+) -> dict:
+    await auth_service.logout(request, token)
     return {
         "success": True,
         "data": {"status": "logged_out"},
@@ -63,8 +85,12 @@ def logout(request: LogoutRequest | None = None, token: str = Depends(get_bearer
 
 
 @router.get("/me")
-def me(token: str = Depends(get_bearer_token), x_trace_id: str | None = Header(default=None)) -> dict:
-    me_response = auth_service.me(token)
+async def me(
+    token: str = Depends(get_bearer_token),
+    auth_service: AuthService = Depends(get_auth_service),
+    x_trace_id: str | None = Header(default=None),
+) -> dict:
+    me_response = await auth_service.me(token)
     return {
         "success": True,
         "data": {
