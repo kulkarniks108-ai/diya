@@ -27,15 +27,17 @@ class SafetyService {
     var state = SafetyState(status: SafetyStatus.idle).toTriggered(DateTime.now());
     state = state.copyWith(location: location).toSending();
 
-    try {
-      final payload = <String, dynamic>{
-        'location': location,
-        'timestamp': DateTime.now().toIso8601String(),
-      };
-      final idempotencyKey = const Uuid().v4();
+    final payload = <String, dynamic>{
+      'location': location,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    // Generate idempotency key ONCE at the point of intent
+    final idempotencyKey = const Uuid().v4();
 
+    try {
       final response = await _api.createSafetyEvent(
         accessToken: accessToken,
+        type: 'SOS',
         payload: payload,
         idempotencyKey: idempotencyKey,
       );
@@ -46,16 +48,13 @@ class SafetyService {
       final failedState = state.toFailed(appError);
 
       if (appError.retryable) {
-        final idempotencyKey = const Uuid().v4();
+        // Persist the SAME idempotency key for retries
         final queueItem = QueueItem(
           id: const Uuid().v4(),
           type: QueueItemType.sos,
-          payload: <String, dynamic>{
-            'location': location,
-            'timestamp': DateTime.now().toIso8601String(),
-          },
+          payload: payload,
           createdAt: DateTime.now(),
-          idempotencyKey: idempotencyKey, // Store for deduplication
+          idempotencyKey: idempotencyKey, // Reusing the same key
         );
         await _queueRepository.enqueue(queueItem);
       }
@@ -79,8 +78,9 @@ class SafetyService {
 
       final response = await _api.createSafetyEvent(
         accessToken: accessToken,
+        type: 'SOS',
         payload: queueItem.payload,
-        idempotencyKey: queueItem.id,
+        idempotencyKey: queueItem.idempotencyKey ?? queueItem.id, // Ensure we use the persisted key
       );
 
       await _queueRepository.dequeue(queueItem.id);

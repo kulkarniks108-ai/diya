@@ -111,8 +111,14 @@ class SafetyController extends ChangeNotifier {
   Future<void> processQueue(String accessToken) async {
     return _queueProcessorLock.acquire(() async {
       await _safetyService.processQueue(accessToken);
-      // Reset state after processing
-      _state = SafetyState(status: SafetyStatus.idle);
+      // Removed the unconditional reset to idle to prevent "silent success" UI reset.
+      // The state will reflect the last processed item's status.
+      // If we want a specific "idle" state after a successful queue process, 
+      // we should check if the queue is now empty.
+      final queue = await _queueRepository.loadQueue();
+      if (queue.isEmpty) {
+        _state = SafetyState(status: SafetyStatus.idle);
+      }
       notifyListeners();
     });
   }

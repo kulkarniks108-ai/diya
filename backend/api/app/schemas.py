@@ -63,3 +63,10 @@ class ArbitrationOutcome(BaseModel):
 class ArbitrationResponse(BaseModel):
     outcome: ArbitrationOutcome
     trace_id: str
+
+
+class SafetyEventCreateRequest(BaseModel):
+    """Request schema for creating a safety event (SOS)."""
+    type: str = Field(default="SOS")
+    payload: dict = Field(default_factory=dict)
+    idempotency_key: str | None = None
