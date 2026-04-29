@@ -9,6 +9,7 @@ class QueueRepository {
 
   SharedPreferences? _prefs;
   static const _queueKey = 'app.queue.items';
+  static const _maxQueueSize = 50; // Maximum number of items in queue
 
   Future<void> _ensurePrefs() async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -28,11 +29,28 @@ class QueueRepository {
     }).whereType<QueueItem>().toList();
   }
 
-  /// Add a single item to the queue.
+  /// Add a single item to the queue with deduplication.
+  /// If an item with the same idempotency key exists, it won't be added again.
   Future<void> enqueue(QueueItem item) async {
     await _ensurePrefs();
     final items = await loadQueue();
+
+    // Check for duplicates by idempotency key
+    if (item.idempotencyKey != null) {
+      final hasDuplicate = items.any((i) => i.idempotencyKey == item.idempotencyKey);
+      if (hasDuplicate) {
+        return; // Skip if duplicate exists
+      }
+    }
+
+    // Add the item
     items.add(item);
+
+    // If queue exceeds max size, remove oldest items
+    if (items.length > _maxQueueSize) {
+      items.removeRange(0, items.length - _maxQueueSize);
+    }
+
     await _persist(items);
   }
 

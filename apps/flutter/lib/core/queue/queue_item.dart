@@ -10,6 +10,7 @@ class QueueItem {
     required this.payload,
     required this.createdAt,
     this.attempts = 0,
+    this.idempotencyKey,
   });
 
   final String id;
@@ -17,6 +18,7 @@ class QueueItem {
   final Map<String, dynamic> payload; // SOS payload (location, timestamp, etc)
   final DateTime createdAt;
   int attempts;
+  final String? idempotencyKey; // For deduplication
 
   Map<String, Object?> toJson() => <String, Object?>{
         'id': id,
@@ -24,6 +26,7 @@ class QueueItem {
         'payload': payload,
         'createdAt': createdAt.toIso8601String(),
         'attempts': attempts,
+        'idempotencyKey': idempotencyKey,
       };
 
   factory QueueItem.fromJson(Map<String, dynamic> json) {
@@ -36,6 +39,7 @@ class QueueItem {
       payload: (json['payload'] as Map<String, dynamic>?)?.cast<String, dynamic>() ?? {},
       createdAt: DateTime.parse(json['createdAt'] as String),
       attempts: (json['attempts'] as int?) ?? 0,
+      idempotencyKey: json['idempotencyKey'] as String?,
     );
   }
 }

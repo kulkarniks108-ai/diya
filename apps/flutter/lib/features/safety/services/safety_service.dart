@@ -46,6 +46,7 @@ class SafetyService {
       final failedState = state.toFailed(appError);
 
       if (appError.retryable) {
+        final idempotencyKey = const Uuid().v4();
         final queueItem = QueueItem(
           id: const Uuid().v4(),
           type: QueueItemType.sos,
@@ -54,6 +55,7 @@ class SafetyService {
             'timestamp': DateTime.now().toIso8601String(),
           },
           createdAt: DateTime.now(),
+          idempotencyKey: idempotencyKey, // Store for deduplication
         );
         await _queueRepository.enqueue(queueItem);
       }

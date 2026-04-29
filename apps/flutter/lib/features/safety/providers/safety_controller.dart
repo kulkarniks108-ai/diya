@@ -6,6 +6,7 @@ import '../../../core/permissions/permission_manager.dart';
 import '../../../core/permissions/permission_manager_impl.dart';
 import '../../../core/network/safety_api.dart';
 import '../../../core/queue/queue_repository.dart';
+import '../../../core/utils/async_lock.dart';
 import '../models/safety_state.dart';
 import '../services/safety_service.dart';
 
@@ -40,6 +41,7 @@ class SafetyController extends ChangeNotifier {
   final SafetyService _safetyService;
   final QueueRepository _queueRepository;
   final PermissionManager _permissionManager;
+  final AsyncLock _queueProcessorLock = AsyncLock();
 
   SafetyState _state = SafetyState(status: SafetyStatus.idle);
 
@@ -107,10 +109,12 @@ class SafetyController extends ChangeNotifier {
 
   /// Process all queued SOS items (called on app bootstrap).
   Future<void> processQueue(String accessToken) async {
-    await _safetyService.processQueue(accessToken);
-    // Reset state after processing
-    _state = SafetyState(status: SafetyStatus.idle);
-    notifyListeners();
+    return _queueProcessorLock.acquire(() async {
+      await _safetyService.processQueue(accessToken);
+      // Reset state after processing
+      _state = SafetyState(status: SafetyStatus.idle);
+      notifyListeners();
+    });
   }
 
   Future<void> openPermissionSettings() async {
