@@ -17,6 +17,8 @@ class AuthRepository(Protocol):
 
     async def get_user_by_email(self, email: str) -> User | None: ...
 
+    async def create_user(self, email: str, password_hash: str, roles: list[str]) -> User: ...
+
     async def get_user_by_id(self, user_id: UUID) -> User | None: ...
 
     async def create_session(self, user: User) -> AuthSession: ...
@@ -38,7 +40,7 @@ class SqlAlchemyAuthRepository:
 
     async def seed_demo_users(self) -> None:
         # Check if users already exist
-        query = select(User).where(User.email.in_(["blind@example.com", "family@example.com"]))
+        query = select(User).where(User.email.in_(["blind@gmail.com", "family@example.com"]))
         result = await self._session.execute(query)
         if result.scalars().first():
             return
@@ -46,8 +48,8 @@ class SqlAlchemyAuthRepository:
         users = [
             User(
                 id=uuid4(),
-                email="blind@example.com",
-                password_hash=hash_password("2ndeye-demo"),
+                email="blind@gmail.com",
+                password_hash=hash_password("Test1234@"),
                 roles=["blind"],
             ),
             User(
@@ -64,6 +66,18 @@ class SqlAlchemyAuthRepository:
         query = select(User).where(User.email == email)
         result = await self._session.execute(query)
         return result.scalar_one_or_none()
+
+    async def create_user(self, email: str, password_hash: str, roles: list[str]) -> User:
+        user = User(
+            id=uuid4(),
+            email=email,
+            password_hash=password_hash,
+            roles=roles,
+        )
+        self._session.add(user)
+        await self._session.commit()
+        await self._session.refresh(user)
+        return user
 
     async def get_user_by_id(self, user_id: UUID) -> User | None:
         return await self._session.get(User, user_id)
@@ -119,10 +133,10 @@ class InMemoryAuthRepository:
             return
 
         self._users = {
-            "blind@example.com": User(
+            "blind@gmail.com": User(
                 id=uuid4(),
-                email="blind@example.com",
-                password_hash=hash_password("2ndeye-demo"),
+                email="blind@gmail.com",
+                password_hash=hash_password("Test1234@"),
                 roles=["blind"],
             ),
             "family@example.com": User(
@@ -136,6 +150,16 @@ class InMemoryAuthRepository:
 
     async def get_user_by_email(self, email: str) -> User | None:
         return self._users.get(email)
+
+    async def create_user(self, email: str, password_hash: str, roles: list[str]) -> User:
+        user = User(
+            id=uuid4(),
+            email=email,
+            password_hash=password_hash,
+            roles=roles,
+        )
+        self._users[email] = user
+        return user
 
     async def get_user_by_id(self, user_id: UUID) -> User | None:
         for user in self._users.values():

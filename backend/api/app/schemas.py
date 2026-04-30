@@ -15,6 +15,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    roles: list[str] = Field(default_factory=lambda: ["blind"])
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 

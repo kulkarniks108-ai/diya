@@ -5,9 +5,9 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from jose import JWTError
 
-from app.config.security import create_access_token, decode_access_token, verify_password
+from app.config.security import create_access_token, decode_access_token, verify_password, hash_password
 from app.config.settings import settings
-from app.schemas import LoginRequest, LogoutRequest, MeResponse, RefreshRequest, TokenPair, UserSummary
+from app.schemas import LoginRequest, RegisterRequest, LogoutRequest, MeResponse, RefreshRequest, TokenPair, UserSummary
 
 from .models import AuthSession, User
 from .repository import AuthRepository
@@ -29,6 +29,20 @@ class AuthService:
             )
 
         session = await self._repository.create_session(user)
+        return self._build_token_pair(user, session)
+
+    async def register(self, request: RegisterRequest) -> TokenPair:
+        existing_user = await self._repository.get_user_by_email(request.email)
+        if existing_user is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "AUTH.EMAIL.EXISTS", "message": "Email already registered"},
+            )
+            
+        password_hash = hash_password(request.password)
+        user = await self._repository.create_user(request.email, password_hash, request.roles)
+        session = await self._repository.create_session(user)
+        
         return self._build_token_pair(user, session)
 
     async def refresh(self, request: RefreshRequest) -> TokenPair:
