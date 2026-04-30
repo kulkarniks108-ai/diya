@@ -1,65 +1,94 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 
 import '../session/session_controller.dart';
 import 'auth_api.dart';
 
 /// Interceptor to handle 401 token expiry by attempting a single refresh.
+/// Queues concurrent 401 requests using a Completer to ensure only one refresh happens.
 class TokenExpiryInterceptor extends Interceptor {
-  TokenExpiryInterceptor({
+  TokenExpiryInterceptor(
+    this._dio, {
     required this.authApi,
     required this.sessionController,
   });
 
+  final Dio _dio;
   final AuthApi authApi;
   final SessionController sessionController;
 
+  bool _isRefreshing = false;
+  Completer<void>? _completer;
+
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
-    // If it's a 401 and we haven't already tried to refresh, attempt refresh
+    // If it's a 401 and we have a session, we need to refresh
     if (err.response?.statusCode == 401) {
       final currentSession = sessionController.state.session;
       if (currentSession == null) {
         return handler.next(err);
       }
 
+      if (_isRefreshing) {
+        // Wait for the ongoing refresh to complete
+        try {
+          await _completer?.future;
+          // After wait, token should be refreshed. Retry request.
+          return _retryRequest(err, handler);
+        } catch (_) {
+          // If the queued refresh failed, pass the error along
+          return handler.next(err);
+        }
+      }
+
+      _isRefreshing = true;
+      _completer = Completer<void>();
+
       try {
-        // Attempt to refresh the token
+        // Attempt to refresh the token using the dedicated AuthApi
         final newSession = await authApi.refresh(session: currentSession);
+        
+        // Update the global session state
         await sessionController.updateSession(newSession);
 
-        // Retry the original request with the new token
-        final requestOptions = err.requestOptions;
-        requestOptions.headers['Authorization'] = 'Bearer ${newSession.accessToken}';
+        // Resolve the completer so queued requests can proceed
+        _completer?.complete();
+        _isRefreshing = false;
+        _completer = null;
 
-        final response = await Dio().request<dynamic>(
-          requestOptions.path,
-          data: requestOptions.data,
-          queryParameters: requestOptions.queryParameters,
-          options: Options(
-            method: requestOptions.method,
-            headers: requestOptions.headers,
-            contentType: requestOptions.contentType,
-            responseType: requestOptions.responseType,
-            receiveTimeout: requestOptions.receiveTimeout,
-            sendTimeout: requestOptions.sendTimeout,
-          ),
-        );
-
-        return handler.resolve(Response<dynamic>(
-          requestOptions: response.requestOptions,
-          statusCode: response.statusCode,
-          statusMessage: response.statusMessage,
-          data: response.data,
-          isRedirect: response.isRedirect,
-          redirects: response.redirects,
-        ));
-      } catch (_) {
-        // If refresh fails, return the original 401 error
-        // SessionController will handle logout
+        // Retry the original request
+        return _retryRequest(err, handler);
+      } catch (e) {
+        // Refresh failed. Revoke session and pass error.
+        _completer?.completeError(e);
+        _isRefreshing = false;
+        _completer = null;
+        
+        await sessionController.signOut();
         return handler.next(err);
       }
     }
 
     return handler.next(err);
+  }
+
+  Future<void> _retryRequest(DioException err, ErrorInterceptorHandler handler) async {
+    final session = sessionController.state.session;
+    if (session == null) {
+      return handler.next(err);
+    }
+
+    // Safely update the authorization header to prevent duplicates
+    err.requestOptions.headers.remove('Authorization');
+    err.requestOptions.headers['Authorization'] = 'Bearer ${session.accessToken}';
+
+    try {
+      // Use the provided dio instance (apiDioProvider) to preserve all configs and interceptors
+      final response = await _dio.fetch<dynamic>(err.requestOptions);
+      return handler.resolve(response);
+    } on DioException catch (e) {
+      return handler.next(e);
+    }
   }
 }

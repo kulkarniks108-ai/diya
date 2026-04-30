@@ -29,7 +29,7 @@ final apiDioProvider = Provider<Dio>((ref) {
     TokenExpiryInterceptor(
       dio,
       authApi: ref.read(authApiProvider),
-      sessionController: ref.read(sessionControllerProvider.notifier),
+      sessionController: ref.read(sessionControllerProvider),
     ),
   );
 
