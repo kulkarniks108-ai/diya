@@ -1,24 +1,49 @@
 import 'dart:async';
+import 'dart:typed_data';
 import '../../domain/models/base_device.dart';
 import '../../domain/models/connection_state.dart';
 import '../../domain/models/hardware_event.dart';
-import '../transports/ble_transport.dart';
+import '../../domain/capabilities/device_capability.dart';
+import '../../domain/transports/device_transport.dart';
+
+class _SmartCaneHapticCapability implements HapticCapability {
+  final DeviceTransport _transport;
+  _SmartCaneHapticCapability(this._transport);
+
+  @override
+  Type get type => HapticCapability;
+
+  @override
+  Future<void> triggerHaptic(int durationMs) async {
+    await _transport.send(Uint8List.fromList([0x03, durationMs & 0xFF]));
+  }
+}
 
 class SmartCaneAdapter implements BaseDevice {
   final String _id;
-  final BleTransport _transport;
+  final DeviceTransport _transport;
   HardwareConnectionState _state = HardwareConnectionState.idle;
+  
   StreamSubscription? _dataSubscription;
   StreamSubscription? _stateSubscription;
   
   final StreamController<HardwareEvent> _eventController = StreamController.broadcast();
+  late final List<DeviceCapability> _capabilities;
 
   SmartCaneAdapter(this._id, this._transport) {
-    _stateSubscription = _transport.connectionState.listen((isConnected) {
-      _state = isConnected ? HardwareConnectionState.ready : HardwareConnectionState.disconnected;
+    _capabilities = [_SmartCaneHapticCapability(_transport)];
+    
+    _stateSubscription = _transport.state.listen((transportState) {
+      if (transportState == TransportState.connected) {
+        _state = HardwareConnectionState.ready;
+      } else if (transportState == TransportState.disconnected) {
+        _state = HardwareConnectionState.disconnected;
+      } else if (transportState == TransportState.error) {
+        _state = HardwareConnectionState.failed;
+      }
     });
     
-    _dataSubscription = _transport.characteristicData.listen(_handleRawData);
+    _dataSubscription = _transport.incoming.listen(_handleRawData);
   }
 
   Stream<HardwareEvent> get events => _eventController.stream;
@@ -33,21 +58,19 @@ class SmartCaneAdapter implements BaseDevice {
   HardwareConnectionState get state => _state;
 
   @override
-  bool get supportsCamera => false;
+  List<DeviceCapability> get capabilities => _capabilities;
 
   @override
-  bool get supportsHaptics => true;
+  T? getCapability<T extends DeviceCapability>() {
+    for (final cap in capabilities) {
+      if (cap.type == T || cap is T) return cap as T;
+    }
+    return null;
+  }
 
-  @override
-  bool get supportsAudio => false;
-
-  @override
-  bool get supportsButtons => true;
-
-  void _handleRawData(List<int> data) {
+  void _handleRawData(Uint8List data) {
     if (data.isEmpty) return;
     
-    // Simplistic mapping for the sake of architecture illustration.
     if (data[0] == 0x01) {
       _eventController.add(ButtonPressEvent(
         deviceId: id,
@@ -61,25 +84,6 @@ class SmartCaneAdapter implements BaseDevice {
         pressType: ButtonPressType.long,
       ));
     }
-  }
-  
-  Future<void> connect() async {
-    _state = HardwareConnectionState.connecting;
-    try {
-      await _transport.connect(_id);
-    } catch (e) {
-      _state = HardwareConnectionState.failed;
-      rethrow;
-    }
-  }
-
-  Future<void> disconnect() async {
-    await _transport.disconnect();
-    _state = HardwareConnectionState.disconnected;
-  }
-  
-  Future<void> triggerHaptic(int durationMs) async {
-    await _transport.writeData([0x03, durationMs & 0xFF]);
   }
 
   void dispose() {
