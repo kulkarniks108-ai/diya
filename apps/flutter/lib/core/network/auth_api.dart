@@ -7,30 +7,9 @@ import '../session/auth_session.dart';
 import 'token_expiry_interceptor.dart';
 
 class AuthApi {
-  AuthApi({Dio? dio})
-      : _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: AppConfig.apiBaseUrl,
-                connectTimeout: const Duration(seconds: 5),
-                receiveTimeout: const Duration(seconds: 5),
-                sendTimeout: const Duration(seconds: 5),
-              ),
-            );
+  AuthApi(this._dio);
 
   final Dio _dio;
-  bool _interceptorRegistered = false;
-
-  /// Register the token expiry interceptor (called after session controller is available).
-  void registerInterceptor(dynamic sessionController) {
-    if (_interceptorRegistered) {
-      return;
-    }
-    _dio.interceptors.add(
-      TokenExpiryInterceptor(authApi: this, sessionController: sessionController),
-    );
-    _interceptorRegistered = true;
-  }
 
   Future<AuthSession> login({required String email, required String password}) async {
     try {
