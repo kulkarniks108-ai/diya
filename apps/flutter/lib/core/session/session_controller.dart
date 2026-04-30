@@ -3,23 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../errors/app_error.dart';
 import '../errors/app_error_mapper.dart';
+import '../network/api_client.dart';
 import '../network/auth_api.dart';
 import '../utils/async_lock.dart';
 import 'auth_session.dart';
 import 'session_repository.dart';
 import 'secure_session_repository.dart';
 
-final authApiProvider = Provider<AuthApi>((ref) => AuthApi());
+final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.read(authDioProvider)));
 
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) => SecureSessionRepository());
 
 final sessionControllerProvider = ChangeNotifierProvider<SessionController>((ref) {
   final authApi = ref.read(authApiProvider);
   final sessionRepository = ref.read(sessionRepositoryProvider);
-  final controller = SessionController(authApi, sessionRepository);
-  // Register the token expiry interceptor after session controller is created
-  authApi.registerInterceptor(controller);
-  return controller;
+  return SessionController(authApi, sessionRepository);
 });
 
 class SessionController extends ChangeNotifier {
