@@ -1,5 +1,4 @@
 import '../models/base_device.dart';
-import '../models/device_command.dart';
 
 /// The single source of truth for device state. 
 /// UI reads ONLY from this manager. 
@@ -13,9 +12,6 @@ abstract class DeviceManager {
   /// Stops scanning
   Future<void> stopScan();
 
-  /// Sends a command to a specific device, ensuring it matches capabilities
-  Future<void> dispatchCommand(String deviceId, DeviceCommand command);
-  
   /// Explicitly disconnect from a device
   Future<void> disconnectDevice(String deviceId);
 

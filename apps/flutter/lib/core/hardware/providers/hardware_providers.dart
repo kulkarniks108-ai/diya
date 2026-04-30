@@ -9,6 +9,7 @@ import '../domain/messaging/event_router.dart';
 import '../infrastructure/manager/backoff_strategy.dart';
 import '../infrastructure/manager/device_manager_impl.dart';
 import '../infrastructure/manager/shared_prefs_device_registry.dart';
+import '../infrastructure/observability/hardware_logger.dart';
 
 // Requires overriding in ProviderScope at app launch
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -41,11 +42,19 @@ final backoffStrategyProvider = Provider<BackoffStrategy>((ref) {
   return BackoffStrategy();
 });
 
+final hardwareLoggerProvider = Provider<HardwareLogger>((ref) {
+  final logger = HardwareLogger();
+  ref.onDispose(() => logger.dispose());
+  return logger;
+});
+
 final deviceManagerProvider = Provider<DeviceManager>((ref) {
   final registry = ref.watch(deviceRegistryProvider);
   final backoffStrategy = ref.watch(backoffStrategyProvider);
+  final logger = ref.watch(hardwareLoggerProvider);
+  final eventBus = ref.watch(hardwareEventBusProvider);
   
-  final manager = DeviceManagerImpl(registry, backoffStrategy);
+  final manager = DeviceManagerImpl(registry, backoffStrategy, logger, eventBus);
   ref.onDispose(() => manager.dispose());
   return manager;
 });
