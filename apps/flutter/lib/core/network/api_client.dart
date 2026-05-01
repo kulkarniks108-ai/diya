@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import '../session/session_controller.dart';
-import 'auth_api.dart';
 import 'token_expiry_interceptor.dart';
 
 /// Base options for all Dio instances.

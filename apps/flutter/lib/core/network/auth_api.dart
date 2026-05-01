@@ -1,10 +1,8 @@
 import 'package:dio/dio.dart';
 
-import '../config/app_config.dart';
 import '../errors/app_error.dart';
 import '../errors/app_error_mapper.dart';
 import '../session/auth_session.dart';
-import 'token_expiry_interceptor.dart';
 
 class AuthApi {
   AuthApi(this._dio);
