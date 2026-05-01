@@ -11,6 +11,7 @@ import '../infrastructure/manager/backoff_strategy.dart';
 import '../infrastructure/manager/device_manager_impl.dart';
 import '../infrastructure/manager/shared_prefs_device_registry.dart';
 import '../infrastructure/observability/hardware_logger.dart';
+import '../infrastructure/transports/device_discovery_server.dart';
 
 // ──────────────────────────────────────────────────────────────
 // External Dependencies (must be overridden in ProviderScope)
@@ -41,6 +42,13 @@ final hardwareLoggerProvider = Provider<HardwareLogger>((ref) {
   final logger = HardwareLogger();
   ref.onDispose(() => logger.dispose());
   return logger;
+});
+
+final deviceDiscoveryServerProvider = Provider<DeviceDiscoveryServer>((ref) {
+  final server = DeviceDiscoveryServer();
+  // Server is started internally by DeviceManager when it initializes
+  ref.onDispose(() => server.stop());
+  return server;
 });
 
 // ──────────────────────────────────────────────────────────────
