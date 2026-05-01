@@ -9,6 +9,8 @@ import 'backoff_strategy.dart';
 import '../../domain/messaging/event_bus.dart';
 import '../transports/device_discovery_server.dart';
 import 'adapter_factory.dart';
+import '../adapters/smart_cane_adapter.dart';
+import '../adapters/smart_goggle_adapter.dart';
 
 // Internal events for the DeviceManager state machine
 abstract class _ManagerEvent {}
@@ -67,7 +69,7 @@ class DeviceManagerImpl implements DeviceManager {
     );
 
     // Save to registry
-    await _registry.saveDevice(knownDevice);
+    await _registry.saveKnownDevice(knownDevice);
     
     _logger.log(HardwareLogEvent(type: LogType.connect, deviceId: deviceId, message: "Discovered via HTTP, attempting connection..."));
     
@@ -129,7 +131,9 @@ class DeviceManagerImpl implements DeviceManager {
       _reconnectionAttempts[event.deviceId] = attempt;
 
       try {
-        final knownDevice = await _registry.getKnownDevice(event.deviceId);
+        final allKnown = await _registry.getKnownDevices();
+        final knownDevice = allKnown.where((d) => d.deviceId == event.deviceId).firstOrNull;
+        
         if (knownDevice == null) {
           throw Exception("Device ${event.deviceId} not found in registry");
         }
