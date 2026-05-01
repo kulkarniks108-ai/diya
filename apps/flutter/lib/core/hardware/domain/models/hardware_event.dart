@@ -1,11 +1,24 @@
+/// Base class for all hardware events flowing through the event pipeline.
+///
+/// Every event carries metadata required for arbitration:
+/// - [priority]: lower value = higher urgency (0 = SOS, 3 = telemetry)
+/// - [trusted]: events from verified adapters get preference during ties
+/// - [eventId]: unique identifier for deduplication and tracing
 abstract class HardwareEvent {
   final String deviceId;
+  final String eventId;
   final DateTime timestamp;
+  final int priority;
+  final bool trusted;
 
   HardwareEvent({
     required this.deviceId,
+    String? eventId,
     DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now().toUtc();
+    this.priority = 0,
+    this.trusted = false,
+  })  : eventId = eventId ?? '${DateTime.now().microsecondsSinceEpoch}',
+        timestamp = timestamp ?? DateTime.now().toUtc();
 }
 
 enum ButtonPressType { short, long, double, triple }
@@ -20,7 +33,10 @@ class ButtonPressEvent extends HardwareEvent {
     required super.deviceId,
     required this.buttonId,
     required this.pressType,
+    super.eventId,
     super.timestamp,
+    super.priority,
+    super.trusted,
   });
 }
 
@@ -32,7 +48,10 @@ class HardwareErrorEvent extends HardwareEvent {
     required super.deviceId,
     required this.errorCode,
     required this.message,
+    super.eventId,
     super.timestamp,
+    super.priority,
+    super.trusted,
   });
 }
 
@@ -44,6 +63,9 @@ class TelemetryEvent extends HardwareEvent {
     required super.deviceId,
     required this.batteryLevel,
     required this.status,
+    super.eventId,
     super.timestamp,
+    super.priority,
+    super.trusted,
   });
 }
