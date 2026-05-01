@@ -42,24 +42,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("2ndEye Hardware Debug"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: "Mock Device",
-            onPressed: () async {
-              // 1. Save fake device to registry
-              final mockDevice = KnownDevice(
-                deviceId: "mock-goggle-${DateTime.now().second}",
-                deviceType: DeviceType.goggle,
-                lastSeenTimestamp: DateTime.now(),
-              );
-              await ref.read(deviceRegistryProvider).saveKnownDevice(mockDevice);
-              
-              // 2. Ask manager to start scanning (will pick up from registry)
-              ref.read(deviceManagerProvider).startScan();
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
