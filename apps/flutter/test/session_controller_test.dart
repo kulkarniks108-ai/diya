@@ -4,6 +4,7 @@ import 'package:diya_flutter/core/session/auth_session.dart';
 import 'package:diya_flutter/core/session/session_controller.dart';
 import 'package:diya_flutter/core/session/session_repository.dart';
 import 'package:diya_flutter/core/network/auth_api.dart';
+import 'package:diya_flutter/core/errors/app_error.dart';
 
 class FakeSessionRepository implements SessionRepository {
   AuthSession? _session;
@@ -29,12 +30,12 @@ class FakeAuthApi extends AuthApi {
 
   @override
   Future<void> me({required String accessToken}) async {
-    if (throwOnMe) throw Exception('401');
+    if (throwOnMe && !accessToken.contains('-refreshed')) throw const AppError(type: AppErrorType.auth, message: '401');
   }
 
   @override
   Future<AuthSession> refresh({required AuthSession session}) async {
-    if (!refreshSucceeds) throw Exception('refresh failed');
+    if (!refreshSucceeds) throw const AppError(type: AppErrorType.auth, message: 'refresh failed');
     return AuthSession(
       userId: session.userId,
       email: session.email,
