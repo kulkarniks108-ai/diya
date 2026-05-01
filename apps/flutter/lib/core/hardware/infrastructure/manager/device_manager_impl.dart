@@ -9,8 +9,6 @@ import 'backoff_strategy.dart';
 import '../../domain/messaging/event_bus.dart';
 import '../transports/device_discovery_server.dart';
 import 'adapter_factory.dart';
-import '../adapters/smart_cane_adapter.dart';
-import '../adapters/smart_goggle_adapter.dart';
 
 // Internal events for the DeviceManager state machine
 abstract class _ManagerEvent {}
@@ -148,22 +146,8 @@ class DeviceManagerImpl implements DeviceManager {
             ? (knownDevice.lastKnownIp ?? '192.168.43.1')
             : knownDevice.deviceId;
 
-        // Extract transport from the adapter capabilites / implementation
-        // Since we know the implementation details, we can start the connection
-        // (A fully decoupled architecture would expose an adapter.connect(address) method)
-        // For now we assume the adapter constructor sets up the transport listening,
-        // but we need to trigger transport.connect() here.
-        // Let's rely on a helper extension or direct method if adapter implements a connectable interface.
-        // For simplicity, we just created the adapter. We assume its transport will try to connect.
-        // Wait, BaseDevice doesn't have connect(). It's a read-only model.
-        // We will add connect() to BaseDevice or handle it via a cast.
-        
-        // Let's temporarily cast it, as we know the concrete implementations we just wrote.
-        if (adapter is SmartGoggleAdapter) {
-          await adapter.connect(address);
-        } else if (adapter is SmartCaneAdapter) {
-          await adapter.connect(address);
-        }
+        // Since adapter implements BaseDevice, we can directly connect
+        await adapter.connect(address);
 
         _internalEvents.add(_TransportConnectedEvent(event.deviceId, adapter));
       } catch (e) {
@@ -181,7 +165,8 @@ class DeviceManagerImpl implements DeviceManager {
       _emitDevices();
     } else if (event is _DisconnectRequestedEvent) {
       _reconnectionTimers[event.deviceId]?.cancel();
-      _activeDevices.remove(event.deviceId);
+      final adapter = _activeDevices.remove(event.deviceId);
+      adapter?.disconnect();
       _logger.log(HardwareLogEvent(type: LogType.disconnect, deviceId: event.deviceId, message: "Manual disconnect"));
       _emitDevices();
     }
