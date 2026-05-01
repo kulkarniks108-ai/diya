@@ -93,6 +93,7 @@ class DeviceManagerImpl implements DeviceManager {
 
   @override
   Future<void> disconnectDevice(String deviceId) async {
+    await _registry.removeDevice(deviceId);
     _internalEvents.add(_DisconnectRequestedEvent(deviceId));
   }
 
