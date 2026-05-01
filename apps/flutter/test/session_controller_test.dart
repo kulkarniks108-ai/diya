@@ -1,6 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
 import 'package:diya_flutter/core/session/auth_session.dart';
 import 'package:diya_flutter/core/session/session_controller.dart';
 import 'package:diya_flutter/core/session/session_repository.dart';
@@ -23,7 +22,7 @@ class FakeSessionRepository implements SessionRepository {
 }
 
 class FakeAuthApi extends AuthApi {
-  FakeAuthApi() : super(dio: null);
+  FakeAuthApi() : super(Dio());
 
   bool throwOnMe = false;
   bool refreshSucceeds = true;
