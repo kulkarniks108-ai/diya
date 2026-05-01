@@ -5,6 +5,7 @@ import '../../domain/models/connection_state.dart';
 import '../../domain/models/hardware_event.dart';
 import '../../domain/capabilities/device_capability.dart';
 import '../../domain/transports/device_transport.dart';
+import '../../domain/messaging/event_bus.dart';
 
 class _SmartCaneHapticCapability implements HapticCapability {
   final DeviceTransport _transport;
@@ -22,6 +23,7 @@ class _SmartCaneHapticCapability implements HapticCapability {
 class SmartCaneAdapter implements BaseDevice {
   final String _id;
   final DeviceTransport _transport;
+  final HardwareEventBus _eventBus;
   HardwareConnectionState _state = HardwareConnectionState.idle;
   
   StreamSubscription? _dataSubscription;
@@ -30,7 +32,7 @@ class SmartCaneAdapter implements BaseDevice {
   final StreamController<HardwareEvent> _eventController = StreamController.broadcast();
   late final List<DeviceCapability> _capabilities;
 
-  SmartCaneAdapter(this._id, this._transport) {
+  SmartCaneAdapter(this._id, this._transport, this._eventBus) {
     _capabilities = [_SmartCaneHapticCapability(_transport)];
     
     _stateSubscription = _transport.state.listen((transportState) {
@@ -71,18 +73,28 @@ class SmartCaneAdapter implements BaseDevice {
   void _handleRawData(Uint8List data) {
     if (data.isEmpty) return;
     
+    HardwareEvent? event;
     if (data[0] == 0x01) {
-      _eventController.add(ButtonPressEvent(
+      event = ButtonPressEvent(
         deviceId: id,
         buttonId: ButtonId.button1,
         pressType: ButtonPressType.short,
-      ));
+        priority: 1,
+        trusted: true,
+      );
     } else if (data[0] == 0x02) {
-      _eventController.add(ButtonPressEvent(
+      event = ButtonPressEvent(
         deviceId: id,
         buttonId: ButtonId.button2,
         pressType: ButtonPressType.long,
-      ));
+        priority: 0,
+        trusted: true,
+      );
+    }
+
+    if (event != null) {
+      _eventController.add(event);
+      _eventBus.publish(event);
     }
   }
 

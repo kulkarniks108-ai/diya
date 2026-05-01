@@ -6,6 +6,7 @@ import 'package:diya_flutter/core/queue/queue_item.dart';
 import 'package:diya_flutter/core/queue/queue_repository.dart';
 import 'package:diya_flutter/core/network/safety_api.dart';
 import 'package:diya_flutter/features/safety/models/safety_state.dart';
+import 'package:dio/dio.dart';
 import 'package:diya_flutter/features/safety/providers/safety_controller.dart';
 import 'package:diya_flutter/features/safety/services/safety_service.dart';
 
@@ -28,7 +29,7 @@ class FakePermissionManager implements PermissionManager {
 }
 
 class FakeSafetyApi extends SafetyApi {
-  FakeSafetyApi() : super(dio: null);
+  FakeSafetyApi() : super(dio: Dio());
 
   bool shouldFail = false;
 
@@ -37,6 +38,7 @@ class FakeSafetyApi extends SafetyApi {
     required String accessToken,
     required Map<String, dynamic> payload,
     required String idempotencyKey,
+    required String type,
   }) async {
     if (shouldFail) {
       throw AppError.network('offline');

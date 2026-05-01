@@ -5,13 +5,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/manager/device_manager.dart';
 import '../domain/manager/device_registry.dart';
 import '../domain/messaging/event_bus.dart';
+import '../domain/messaging/event_arbitrator.dart';
 import '../domain/messaging/event_router.dart';
 import '../infrastructure/manager/backoff_strategy.dart';
 import '../infrastructure/manager/device_manager_impl.dart';
 import '../infrastructure/manager/shared_prefs_device_registry.dart';
 import '../infrastructure/observability/hardware_logger.dart';
 
-// Requires overriding in ProviderScope at app launch
+// ──────────────────────────────────────────────────────────────
+// External Dependencies (must be overridden in ProviderScope)
+// ──────────────────────────────────────────────────────────────
+
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('sharedPreferencesProvider must be overridden');
 });
@@ -20,22 +24,13 @@ final dioProvider = Provider<Dio>((ref) {
   return Dio();
 });
 
+// ──────────────────────────────────────────────────────────────
+// Infrastructure
+// ──────────────────────────────────────────────────────────────
+
 final deviceRegistryProvider = Provider<DeviceRegistry>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return SharedPreferencesDeviceRegistry(prefs);
-});
-
-final hardwareEventBusProvider = Provider<HardwareEventBus>((ref) {
-  final bus = HardwareEventBusImpl();
-  ref.onDispose(() => bus.dispose());
-  return bus;
-});
-
-final eventRouterProvider = Provider<EventRouter>((ref) {
-  final bus = ref.watch(hardwareEventBusProvider);
-  final router = EventRouter(bus);
-  ref.onDispose(() => router.dispose());
-  return router;
 });
 
 final backoffStrategyProvider = Provider<BackoffStrategy>((ref) {
@@ -47,6 +42,32 @@ final hardwareLoggerProvider = Provider<HardwareLogger>((ref) {
   ref.onDispose(() => logger.dispose());
   return logger;
 });
+
+// ──────────────────────────────────────────────────────────────
+// Event Pipeline: EventBus → EventRouter (with Arbitration)
+// ──────────────────────────────────────────────────────────────
+
+final hardwareEventBusProvider = Provider<HardwareEventBus>((ref) {
+  final bus = HardwareEventBusImpl();
+  ref.onDispose(() => bus.dispose());
+  return bus;
+});
+
+final eventArbitratorProvider = Provider<EventArbitrator>((ref) {
+  return const EventArbitrator();
+});
+
+final eventRouterProvider = Provider<EventRouter>((ref) {
+  final bus = ref.watch(hardwareEventBusProvider);
+  final arbitrator = ref.watch(eventArbitratorProvider);
+  final router = EventRouter(bus, arbitrator);
+  ref.onDispose(() => router.dispose());
+  return router;
+});
+
+// ──────────────────────────────────────────────────────────────
+// Device Manager (lifecycle only — does NOT route events)
+// ──────────────────────────────────────────────────────────────
 
 final deviceManagerProvider = Provider<DeviceManager>((ref) {
   final registry = ref.watch(deviceRegistryProvider);

@@ -5,6 +5,7 @@ import '../../domain/models/base_device.dart';
 import '../../domain/models/connection_state.dart';
 import '../../domain/capabilities/device_capability.dart';
 import '../../domain/transports/device_transport.dart';
+import '../../domain/messaging/event_bus.dart';
 
 class _SmartGoggleCameraCapability implements CameraCapability {
   final DeviceTransport _transport;
@@ -29,13 +30,14 @@ class _SmartGoggleCameraCapability implements CameraCapability {
 class SmartGoggleAdapter implements BaseDevice {
   final String _id;
   final DeviceTransport _transport;
+  final HardwareEventBus _eventBus;
   
   HardwareConnectionState _state = HardwareConnectionState.idle;
   late final List<DeviceCapability> _capabilities;
 
   StreamSubscription? _stateSubscription;
 
-  SmartGoggleAdapter(this._id, this._transport) {
+  SmartGoggleAdapter(this._id, this._transport, this._eventBus) {
     _capabilities = [_SmartGoggleCameraCapability(_transport)];
 
     _stateSubscription = _transport.state.listen((transportState) {
