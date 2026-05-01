@@ -7,6 +7,8 @@ import '../../domain/observability/hardware_log_event.dart';
 import '../observability/hardware_logger.dart';
 import 'backoff_strategy.dart';
 import '../../domain/messaging/event_bus.dart';
+import '../transports/device_discovery_server.dart';
+import 'adapter_factory.dart';
 
 // Internal events for the DeviceManager state machine
 abstract class _ManagerEvent {}
@@ -20,6 +22,9 @@ class DeviceManagerImpl implements DeviceManager {
   final BackoffStrategy _backoffStrategy;
   final HardwareLogger _logger;
   final HardwareEventBus _eventBus;
+  final AdapterFactory _adapterFactory;
+  final DeviceDiscoveryServer _discoveryServer;
+  StreamSubscription? _discoverySubscription;
 
   final Map<String, BaseDevice> _activeDevices = {};
   final StreamController<List<BaseDevice>> _devicesController = StreamController.broadcast();
@@ -34,9 +39,41 @@ class DeviceManagerImpl implements DeviceManager {
     this._registry, 
     this._backoffStrategy, 
     this._logger, 
-    this._eventBus
+    this._eventBus,
+    this._adapterFactory,
+    this._discoveryServer,
   ) {
     _internalEvents.stream.listen(_handleInternalEvent);
+    
+    // Auto-start discovery server
+    _discoveryServer.start();
+    _discoverySubscription = _discoveryServer.onDeviceRegistered.listen(_handleDiscoveryEvent);
+  }
+
+  Future<void> _handleDiscoveryEvent(Map<String, dynamic> data) async {
+    final deviceId = data['device_id'] as String?;
+    final deviceTypeStr = data['device_type'] as String?;
+    final sourceIp = data['source_ip'] as String?;
+
+    if (deviceId == null || deviceTypeStr == null) return;
+
+    final type = deviceTypeStr == 'goggle' ? DeviceType.goggle : DeviceType.cane;
+    
+    final knownDevice = KnownDevice(
+      deviceId: deviceId,
+      deviceType: type,
+      lastKnownIp: sourceIp,
+      lastSeenTimestamp: DateTime.now(),
+    );
+
+    // Save to registry
+    await _registry.saveDevice(knownDevice);
+    
+    _logger.log(HardwareLogEvent(type: LogType.connect, deviceId: deviceId, message: "Discovered via HTTP, attempting connection..."));
+    
+    // Trigger connection
+    _reconnectionAttempts[deviceId] = 0;
+    _triggerReconnection(deviceId);
   }
 
   @override
@@ -92,9 +129,39 @@ class DeviceManagerImpl implements DeviceManager {
       _reconnectionAttempts[event.deviceId] = attempt;
 
       try {
-        // Here we would resolve the transport and listen to its state stream.
-        // For demonstration of the state engine failure path:
-        throw Exception("Adapter resolution not fully implemented");
+        final knownDevice = await _registry.getKnownDevice(event.deviceId);
+        if (knownDevice == null) {
+          throw Exception("Device ${event.deviceId} not found in registry");
+        }
+
+        final adapter = _adapterFactory.createAdapter(
+          deviceId: knownDevice.deviceId,
+          deviceType: knownDevice.deviceType.name,
+        );
+
+        // Determine the address to connect to (IP for goggle, Mac for BLE cane)
+        final address = knownDevice.deviceType == DeviceType.goggle 
+            ? (knownDevice.lastKnownIp ?? '192.168.43.1')
+            : knownDevice.deviceId;
+
+        // Extract transport from the adapter capabilites / implementation
+        // Since we know the implementation details, we can start the connection
+        // (A fully decoupled architecture would expose an adapter.connect(address) method)
+        // For now we assume the adapter constructor sets up the transport listening,
+        // but we need to trigger transport.connect() here.
+        // Let's rely on a helper extension or direct method if adapter implements a connectable interface.
+        // For simplicity, we just created the adapter. We assume its transport will try to connect.
+        // Wait, BaseDevice doesn't have connect(). It's a read-only model.
+        // We will add connect() to BaseDevice or handle it via a cast.
+        
+        // Let's temporarily cast it, as we know the concrete implementations we just wrote.
+        if (adapter is SmartGoggleAdapter) {
+          await adapter.connect(address);
+        } else if (adapter is SmartCaneAdapter) {
+          await adapter.connect(address);
+        }
+
+        _internalEvents.add(_TransportConnectedEvent(event.deviceId, adapter));
       } catch (e) {
         _logger.log(HardwareLogEvent(type: LogType.error, deviceId: event.deviceId, message: "Connect failed: $e"));
         _internalEvents.add(_TransportFailedEvent(event.deviceId));

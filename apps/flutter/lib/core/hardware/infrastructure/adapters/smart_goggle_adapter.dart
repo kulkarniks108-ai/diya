@@ -51,6 +51,10 @@ class SmartGoggleAdapter implements BaseDevice {
     });
   }
 
+  Future<void> connect(String address) async {
+    await _transport.connect(address);
+  }
+
   @override
   String get id => _id;
 
