@@ -10,6 +10,32 @@ import 'package:dio/dio.dart';
 import 'package:diya_flutter/features/safety/providers/safety_controller.dart';
 import 'package:diya_flutter/features/safety/services/safety_service.dart';
 
+import 'dart:async';
+import 'dart:async';
+import 'package:diya_flutter/core/hardware/domain/messaging/arbitration_result.dart';
+import 'package:diya_flutter/core/hardware/domain/messaging/event_router.dart';
+import 'package:diya_flutter/core/hardware/domain/models/hardware_event.dart';
+import 'package:diya_flutter/core/session/session_repository.dart';
+import 'package:diya_flutter/core/session/auth_session.dart';
+
+class FakeEventRouter implements EventRouter {
+  final _controller = StreamController<HardwareEvent>.broadcast();
+  @override
+  Stream<HardwareEvent> get resolvedEvents => _controller.stream;
+  @override
+  Stream<ArbitrationResult> get arbitrationLog => const Stream.empty();
+  @override
+  Duration get bufferDuration => const Duration(milliseconds: 300);
+  @override
+  void dispose() => _controller.close();
+}
+
+class FakeSessionRepository implements SessionRepository {
+  @override Future<void> save(AuthSession session) async {}
+  @override Future<AuthSession?> load() async => AuthSession(userId: 'u', email: 'e', roles: [], accessToken: 'token', refreshToken: 'refresh', sessionId: 's', tokenVersion: 1);
+  @override Future<void> clear() async {}
+}
+
 class FakePermissionManager implements PermissionManager {
   FakePermissionManager(this.status);
 
@@ -100,7 +126,7 @@ void main() {
         safetyApi: FakeSafetyApi(),
         queueRepository: queueRepository,
       );
-      final controller = SafetyController(service, queueRepository, permissionManager);
+      final controller = SafetyController(service, queueRepository, permissionManager, FakeEventRouter(), FakeSessionRepository());
 
       await controller.triggerSOS(accessToken: 'token', location: 'loc');
 
@@ -117,7 +143,7 @@ void main() {
         safetyApi: FakeSafetyApi(),
         queueRepository: queueRepository,
       );
-      final controller = SafetyController(service, queueRepository, permissionManager);
+      final controller = SafetyController(service, queueRepository, permissionManager, FakeEventRouter(), FakeSessionRepository());
 
       await controller.triggerSOS(accessToken: 'token', location: 'loc');
 

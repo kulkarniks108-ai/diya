@@ -16,4 +16,7 @@ abstract class BaseDevice {
     }
     return null;
   }
+
+  Future<void> connect(String address);
+  Future<void> disconnect();
 }

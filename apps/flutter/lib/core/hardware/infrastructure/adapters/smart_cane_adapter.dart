@@ -48,6 +48,16 @@ class SmartCaneAdapter implements BaseDevice {
     _dataSubscription = _transport.incoming.listen(_handleRawData);
   }
 
+  @override
+  Future<void> connect(String address) async {
+    await _transport.connect(address);
+  }
+
+  @override
+  Future<void> disconnect() async {
+    await _transport.disconnect();
+  }
+
   Stream<HardwareEvent> get events => _eventController.stream;
 
   @override

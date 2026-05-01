@@ -35,11 +35,41 @@ class DeviceDiscoveryServer {
         } finally {
           await request.response.close();
         }
+      } else if (request.uri.path == '/' && request.method == 'GET') {
+        _serveHomePage(request);
       } else {
         request.response.statusCode = HttpStatus.notFound;
         await request.response.close();
       }
     });
+  }
+
+  void _serveHomePage(HttpRequest request) async {
+    request.response.statusCode = HttpStatus.ok;
+    request.response.headers.contentType = ContentType.html;
+    request.response.write('''
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>2ndEye Device Server</title>
+        <style>
+          body { font-family: -apple-system, sans-serif; padding: 40px; background: #121212; color: #fff; }
+          .container { max-width: 600px; margin: 0 auto; background: #1e1e1e; padding: 24px; border-radius: 12px; }
+          h1 { color: #00d2ff; }
+          .status { display: inline-block; padding: 8px 12px; background: #004d40; color: #1de9b6; border-radius: 6px; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>2ndEye Hotspot Server</h1>
+          <p>This is the local discovery server running on the user's phone.</p>
+          <div class="status">● Server is Active & Listening</div>
+          <p style="margin-top: 24px; color: #888;">Hardware devices (like Smart Goggles) connect here via POST /register</p>
+        </div>
+      </body>
+      </html>
+    ''');
+    await request.response.close();
   }
 
   Future<void> stop() async {

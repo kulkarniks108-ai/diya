@@ -10,6 +10,13 @@ import '../../../core/utils/async_lock.dart';
 import '../models/safety_state.dart';
 import '../services/safety_service.dart';
 
+import 'dart:async';
+import '../../../core/hardware/domain/messaging/event_router.dart';
+import '../../../core/hardware/domain/models/hardware_event.dart';
+import '../../../core/hardware/providers/hardware_providers.dart';
+import '../../../core/session/session_repository.dart';
+import '../../../core/session/session_controller.dart';
+
 // Providers
 final safetyApiProvider = Provider<SafetyApi>((ref) => SafetyApi());
 
@@ -31,17 +38,31 @@ final safetyControllerProvider = ChangeNotifierProvider<SafetyController>((ref) 
     ref.read(safetyServiceProvider),
     ref.read(queueRepositoryProvider),
     ref.read(permissionManagerProviderAlias),
+    ref.read(eventRouterProvider),
+    ref.read(sessionRepositoryProvider),
   );
 });
 
 /// Controller for managing safety/SOS state using Riverpod ChangeNotifier pattern.
 class SafetyController extends ChangeNotifier {
-  SafetyController(this._safetyService, this._queueRepository, this._permissionManager);
+  SafetyController(
+    this._safetyService, 
+    this._queueRepository, 
+    this._permissionManager,
+    this._eventRouter,
+    this._sessionRepository,
+  ) {
+    _hardwareSubscription = _eventRouter.resolvedEvents.listen(_onHardwareEvent);
+  }
 
   final SafetyService _safetyService;
   final QueueRepository _queueRepository;
   final PermissionManager _permissionManager;
+  final EventRouter _eventRouter;
+  final SessionRepository _sessionRepository;
+  
   final AsyncLock _queueProcessorLock = AsyncLock();
+  StreamSubscription? _hardwareSubscription;
 
   SafetyState _state = SafetyState(status: SafetyStatus.idle);
 
@@ -131,5 +152,40 @@ class SafetyController extends ChangeNotifier {
   void reset() {
     _state = SafetyState(status: SafetyStatus.idle);
     notifyListeners();
+  }
+
+  Future<void> _onHardwareEvent(HardwareEvent event) async {
+    // SOS events are identified by priority 0
+    if (event is ButtonPressEvent && event.priority == 0) {
+      // Fetch session to get the access token
+      final session = await _sessionRepository.load();
+      if (session == null || session.accessToken.isEmpty) {
+        // Cannot send SOS without an active user session.
+        // We log it or handle it according to requirements.
+        _state = SafetyState(
+          status: SafetyStatus.failed,
+          error: const AppError(
+            type: AppErrorType.auth,
+            message: "Cannot send SOS: User not logged in.",
+          ),
+        );
+        notifyListeners();
+        return;
+      }
+
+      // We ideally want actual location, but for hardware triggers
+      // we can fetch it dynamically or pass a default "Hardware triggered" message.
+      // Assuming triggerSOS handles the real location fetching downstream via PermissionManager.
+      await triggerSOS(
+        accessToken: session.accessToken,
+        location: 'Hardware Triggered (Location Pending)',
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _hardwareSubscription?.cancel();
+    super.dispose();
   }
 }

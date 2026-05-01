@@ -7,10 +7,12 @@ import '../domain/manager/device_registry.dart';
 import '../domain/messaging/event_bus.dart';
 import '../domain/messaging/event_arbitrator.dart';
 import '../domain/messaging/event_router.dart';
+import '../infrastructure/manager/adapter_factory.dart';
 import '../infrastructure/manager/backoff_strategy.dart';
 import '../infrastructure/manager/device_manager_impl.dart';
 import '../infrastructure/manager/shared_prefs_device_registry.dart';
 import '../infrastructure/observability/hardware_logger.dart';
+import '../infrastructure/transports/device_discovery_server.dart';
 
 // ──────────────────────────────────────────────────────────────
 // External Dependencies (must be overridden in ProviderScope)
@@ -43,6 +45,13 @@ final hardwareLoggerProvider = Provider<HardwareLogger>((ref) {
   return logger;
 });
 
+final deviceDiscoveryServerProvider = Provider<DeviceDiscoveryServer>((ref) {
+  final server = DeviceDiscoveryServer();
+  // Server is started internally by DeviceManager when it initializes
+  ref.onDispose(() => server.stop());
+  return server;
+});
+
 // ──────────────────────────────────────────────────────────────
 // Event Pipeline: EventBus → EventRouter (with Arbitration)
 // ──────────────────────────────────────────────────────────────
@@ -65,6 +74,12 @@ final eventRouterProvider = Provider<EventRouter>((ref) {
   return router;
 });
 
+final adapterFactoryProvider = Provider<AdapterFactory>((ref) {
+  final dio = ref.watch(dioProvider);
+  final eventBus = ref.watch(hardwareEventBusProvider);
+  return AdapterFactory(dio, eventBus);
+});
+
 // ──────────────────────────────────────────────────────────────
 // Device Manager (lifecycle only — does NOT route events)
 // ──────────────────────────────────────────────────────────────
@@ -74,8 +89,17 @@ final deviceManagerProvider = Provider<DeviceManager>((ref) {
   final backoffStrategy = ref.watch(backoffStrategyProvider);
   final logger = ref.watch(hardwareLoggerProvider);
   final eventBus = ref.watch(hardwareEventBusProvider);
+  final adapterFactory = ref.watch(adapterFactoryProvider);
+  final discoveryServer = ref.watch(deviceDiscoveryServerProvider);
   
-  final manager = DeviceManagerImpl(registry, backoffStrategy, logger, eventBus);
+  final manager = DeviceManagerImpl(
+    registry, 
+    backoffStrategy, 
+    logger, 
+    eventBus,
+    adapterFactory,
+    discoveryServer,
+  );
   ref.onDispose(() => manager.dispose());
   return manager;
 });
