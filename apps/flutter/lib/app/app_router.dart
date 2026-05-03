@@ -6,6 +6,7 @@ import '../features/auth/login_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/safety/providers/safety_bootstrap.dart';
 import '../features/startup/startup_screen.dart';
+import '../features/debug/screens/debug_dashboard_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final sessionController = ref.watch(sessionControllerProvider);
@@ -56,6 +57,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/debug',
+        builder: (context, state) => const DebugDashboardScreen(),
       ),
     ],
   );
