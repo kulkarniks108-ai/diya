@@ -39,14 +39,14 @@ class DebugSosTab extends ConsumerWidget {
             onPressed: state.status == SafetyStatus.sending
                 ? null
                 : () async {
-                    if (sessionState.accessToken == null) {
+                    if (sessionState.session?.accessToken == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Error: No active session. Please log in.')),
                       );
                       return;
                     }
                     await safetyController.triggerSOS(
-                      accessToken: sessionState.accessToken!,
+                      accessToken: sessionState.session!.accessToken,
                       location: 'Debug User Location (Lat: 40.71, Lng: -74.00)',
                     );
                   },
