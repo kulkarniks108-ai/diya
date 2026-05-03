@@ -23,7 +23,12 @@ class _SecretDebugTriggerState extends State<SecretDebugTrigger> {
   int _tapCount = 0;
   DateTime? _lastTapTime;
 
-  void _handleTap() {
+  void _handlePointerDown(PointerDownEvent event) {
+    // Only capture taps in the top 120 pixels (the header/AppBar area)
+    if (event.position.dy > 120) {
+      return;
+    }
+
     final now = DateTime.now();
     
     if (_lastTapTime != null && now.difference(_lastTapTime!) > widget.resetDuration) {
@@ -44,9 +49,11 @@ class _SecretDebugTriggerState extends State<SecretDebugTrigger> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    // Using Listener instead of GestureDetector to catch raw pointer events
+    // before the gesture arena resolves them, ensuring taps aren't swallowed by children.
+    return Listener(
       behavior: HitTestBehavior.translucent,
-      onTap: _handleTap,
+      onPointerDown: _handlePointerDown,
       child: widget.child,
     );
   }
