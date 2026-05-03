@@ -142,6 +142,10 @@ class DeviceManagerImpl implements DeviceManager {
           deviceType: knownDevice.deviceType.name,
         );
 
+        // Add to active devices immediately so the UI shows it (e.g. as connecting/idle)
+        _activeDevices[event.deviceId] = adapter;
+        _emitDevices();
+
         // Determine the address to connect to (IP for goggle, Mac for BLE cane)
         final address = knownDevice.deviceType == DeviceType.goggle 
             ? (knownDevice.lastKnownIp ?? '192.168.43.1')
@@ -156,11 +160,12 @@ class DeviceManagerImpl implements DeviceManager {
         _internalEvents.add(_TransportFailedEvent(event.deviceId));
       }
     } else if (event is _TransportFailedEvent) {
-      _activeDevices.remove(event.deviceId);
+      // Do NOT remove the device from active devices, so it remains visible in the UI with a 'failed' state.
       _emitDevices();
       _triggerReconnection(event.deviceId);
     } else if (event is _TransportConnectedEvent) {
       _reconnectionAttempts[event.deviceId] = 0;
+      // It's already in activeDevices, but we can assign it again just to be safe.
       _activeDevices[event.deviceId] = event.device;
       _logger.log(HardwareLogEvent(type: LogType.connect, deviceId: event.deviceId, message: "Connected successfully"));
       _emitDevices();
