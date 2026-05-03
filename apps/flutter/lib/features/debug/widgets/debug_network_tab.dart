@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/config/app_config.dart';
 
@@ -14,7 +16,10 @@ class DebugNetworkTab extends ConsumerStatefulWidget {
 
 class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
   final NetworkInfo _networkInfo = NetworkInfo();
+  
   String _wifiIP = 'Loading...';
+  bool _isLoadingIP = true;
+
   String _pingResult = '';
   Color _pingColor = Colors.grey;
   bool _isPinging = false;
@@ -26,14 +31,35 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
   }
 
   Future<void> _fetchIP() async {
+    setState(() {
+      _isLoadingIP = true;
+      _wifiIP = 'Checking permissions...';
+    });
+
     try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        final status = await Permission.locationWhenInUse.request();
+        if (!status.isGranted) {
+          setState(() {
+            _wifiIP = 'Permission Denied';
+            _isLoadingIP = false;
+          });
+          return;
+        }
+      }
+
       final ip = await _networkInfo.getWifiIP();
+      
       setState(() {
-        _wifiIP = ip ?? 'Unknown (Check WiFi/Location permissions)';
+        _wifiIP = ip ?? 'Unknown (Check WiFi)';
       });
     } catch (e) {
       setState(() {
-        _wifiIP = 'Error retrieving IP';
+        _wifiIP = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingIP = false;
       });
     }
   }
@@ -47,9 +73,6 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
 
     try {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5)));
-      // AppConfig.apiBaseUrl is typically "http://IP:8000/api/v1"
-      // The health endpoint is usually at "http://IP:8000/health" or similar.
-      // We will parse the baseUrl to hit the root health endpoint.
       final uri = Uri.parse(AppConfig.apiBaseUrl);
       final healthUrl = '${uri.scheme}://${uri.host}:${uri.port}/health';
       
@@ -68,9 +91,14 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
           _pingColor = Colors.red;
         });
       }
+    } on DioException catch (e) {
+      setState(() {
+        _pingResult = 'FAILED: ${e.message}';
+        _pingColor = Colors.red;
+      });
     } catch (e) {
       setState(() {
-        _pingResult = 'FAILED to connect:\n${e.toString()}';
+        _pingResult = 'FAILED to connect:\n$e';
         _pingColor = Colors.red;
       });
     } finally {
@@ -97,6 +125,7 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
             value: _wifiIP,
             icon: Icons.wifi,
             actionIcon: Icons.refresh,
+            isLoading: _isLoadingIP,
             onAction: _fetchIP,
           ),
           const SizedBox(height: 16),
@@ -141,6 +170,7 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
     required String value,
     required IconData icon,
     IconData? actionIcon,
+    bool isLoading = false,
     VoidCallback? onAction,
   }) {
     return Card(
@@ -163,10 +193,15 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
               ),
             ),
             if (actionIcon != null && onAction != null)
-              IconButton(
-                icon: Icon(actionIcon),
-                onPressed: onAction,
-              ),
+              isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  : IconButton(
+                      icon: Icon(actionIcon),
+                      onPressed: onAction,
+                    ),
           ],
         ),
       ),
