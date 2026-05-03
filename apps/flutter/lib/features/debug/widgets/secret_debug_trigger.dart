@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../app/app_router.dart';
 
 /// A wrapper widget that listens for 5 rapid taps on its child to navigate to the debug screen.
 /// Ideal for wrapping a top-level scaffold or an app bar to provide hidden access.
-class SecretDebugTrigger extends StatefulWidget {
+class SecretDebugTrigger extends ConsumerStatefulWidget {
   final Widget child;
   final int requiredTaps;
   final Duration resetDuration;
@@ -16,10 +18,10 @@ class SecretDebugTrigger extends StatefulWidget {
   });
 
   @override
-  State<SecretDebugTrigger> createState() => _SecretDebugTriggerState();
+  ConsumerState<SecretDebugTrigger> createState() => _SecretDebugTriggerState();
 }
 
-class _SecretDebugTriggerState extends State<SecretDebugTrigger> {
+class _SecretDebugTriggerState extends ConsumerState<SecretDebugTrigger> {
   int _tapCount = 0;
   DateTime? _lastTapTime;
 
@@ -42,8 +44,9 @@ class _SecretDebugTriggerState extends State<SecretDebugTrigger> {
     if (_tapCount >= widget.requiredTaps) {
       _tapCount = 0; // Reset after triggering
       
-      // Navigate to the debug dashboard
-      context.push('/debug');
+      // Navigate to the debug dashboard using the global router provider
+      // to avoid 'No GoRouter found in context' errors when placed above the Navigator.
+      ref.read(appRouterProvider).push('/debug');
     }
   }
 
@@ -58,3 +61,4 @@ class _SecretDebugTriggerState extends State<SecretDebugTrigger> {
     );
   }
 }
+
