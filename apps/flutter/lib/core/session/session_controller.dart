@@ -3,21 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../errors/app_error.dart';
 import '../errors/app_error_mapper.dart';
-import '../network/api_client.dart';
 import '../network/auth_api.dart';
 import '../utils/async_lock.dart';
 import 'auth_session.dart';
 import 'session_repository.dart';
 import 'secure_session_repository.dart';
 
-final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.read(authDioProvider)));
+final authApiProvider = Provider<AuthApi>((ref) => AuthApi());
 
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) => SecureSessionRepository());
 
 final sessionControllerProvider = ChangeNotifierProvider<SessionController>((ref) {
   final authApi = ref.read(authApiProvider);
   final sessionRepository = ref.read(sessionRepositoryProvider);
-  return SessionController(authApi, sessionRepository);
+  final controller = SessionController(authApi, sessionRepository);
+  // Register the token expiry interceptor after session controller is created
+  authApi.registerInterceptor(controller);
+  return controller;
 });
 
 class SessionController extends ChangeNotifier {
@@ -100,25 +102,6 @@ class SessionController extends ChangeNotifier {
 
     try {
       final session = await _authApi.login(email: email, password: password);
-      await _sessionRepository.save(session);
-      _state = SessionState(status: AuthStatus.authenticated, session: session);
-    } on AppError catch (error) {
-      _state = SessionState(status: AuthStatus.error, error: error);
-    }
-
-    notifyListeners();
-  }
-
-  Future<void> signUp({
-    required String email,
-    required String password,
-    required List<String> roles,
-  }) async {
-    _state = SessionState(status: AuthStatus.refreshing, session: _state.session);
-    notifyListeners();
-
-    try {
-      final session = await _authApi.register(email: email, password: password, roles: roles);
       await _sessionRepository.save(session);
       _state = SessionState(status: AuthStatus.authenticated, session: session);
     } on AppError catch (error) {

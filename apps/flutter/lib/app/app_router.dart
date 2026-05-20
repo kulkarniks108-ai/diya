@@ -4,10 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../core/session/session_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/debug/device_debug_screen.dart';
 import '../features/safety/providers/safety_bootstrap.dart';
 import '../features/startup/startup_screen.dart';
-import '../features/debug/screens/debug_dashboard_screen.dart';
-import '../features/debug/screens/device_detail_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final sessionController = ref.watch(sessionControllerProvider);
@@ -27,6 +26,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isLoginRoute = location == '/login';
       final isHomeRoute = location == '/home';
+      final isDebugRoute = location == '/debug';
 
       if (!sessionState.isAuthenticated && !isLoginRoute) {
         return '/login';
@@ -40,7 +40,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return '/home';
       }
 
-      if (!sessionState.isAuthenticated && isHomeRoute) {
+      if (!sessionState.isAuthenticated && (isHomeRoute || isDebugRoute)) {
         return '/login';
       }
 
@@ -61,16 +61,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/debug',
-        builder: (context, state) => const DebugDashboardScreen(),
-        routes: [
-          GoRoute(
-            path: 'device/:id',
-            builder: (context, state) {
-              final deviceId = state.pathParameters['id']!;
-              return DeviceDetailScreen(deviceId: deviceId);
-            },
-          ),
-        ],
+        builder: (context, state) => const DeviceDebugScreen(),
       ),
     ],
   );
