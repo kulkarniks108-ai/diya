@@ -38,7 +38,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   double? _ultrasonicCm;
   Timer? _telemetryTimer;
   bool _isCapturing = false;
-  String? _captureImageDataUrl;
+  Uint8List? _captureImageBytes;
   String? _captureError;
   bool _hasRequestedRetry = false;
 
@@ -179,20 +179,37 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     });
 
     try {
-      final String? imageDataUrl;
+      Uint8List? bytes;
       if (capability != null) {
-        imageDataUrl = await capability.capture();
+        bytes = await capability.capture();
       } else {
-        final response = await _requestKnownDeviceJson('POST', '/command', body: {'command': 'capture'});
-        imageDataUrl = response['image_data_url'] as String?;
+        // Prefer binary /capture endpoint; fall back to JSON /command
+        try {
+          final uri = _knownDeviceUri('/capture');
+          if (uri != null) {
+            final resp = await _buildDio().postUri(uri, options: Options(responseType: ResponseType.bytes));
+            if (resp.statusCode == 200 && resp.data is List<int>) {
+              bytes = Uint8List.fromList(resp.data as List<int>);
+            }
+          }
+        } catch (_) {
+          // ignore and try JSON fallback
+        }
+
+        if (bytes == null) {
+          final response = await _requestKnownDeviceJson('POST', '/command', body: {'command': 'capture'});
+          final imageDataUrl = response['image_data_url'] as String?;
+          bytes = _decodeDataUrl(imageDataUrl);
+        }
       }
+
       if (!mounted) return;
       setState(() {
-        if (imageDataUrl == null || imageDataUrl.isEmpty) {
+        if (bytes == null || bytes.isEmpty) {
           _captureError = 'No image returned by device';
           return;
         }
-        _captureImageDataUrl = imageDataUrl;
+        _captureImageBytes = bytes;
       });
     } catch (e) {
       if (!mounted) return;
@@ -551,7 +568,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Builder(builder: (context) {
-                      final imageBytes = _decodeDataUrl(_captureImageDataUrl);
+                      final imageBytes = _captureImageBytes;
                       if (imageBytes != null) {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(8),
