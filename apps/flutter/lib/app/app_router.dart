@@ -5,6 +5,7 @@ import '../core/session/session_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/debug/device_debug_screen.dart';
+import '../features/debug/screens/device_detail_screen.dart';
 import '../features/safety/providers/safety_bootstrap.dart';
 import '../features/startup/startup_screen.dart';
 
@@ -62,6 +63,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/debug',
         builder: (context, state) => const DeviceDebugScreen(),
+      ),
+      GoRoute(
+        path: '/debug/device/:id',
+        builder: (context, state) => DeviceDetailScreen(deviceId: state.pathParameters['id'] ?? ''),
       ),
     ],
   );

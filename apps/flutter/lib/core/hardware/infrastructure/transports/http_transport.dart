@@ -67,6 +67,34 @@ class HttpTransportImpl implements DeviceTransport {
     }
   }
 
+  @override
+  Future<Map<String, dynamic>> requestJson(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Duration? timeout,
+  }) async {
+    if (_currentState != TransportState.connected || _connectedIp == null) {
+      throw Exception('Cannot request while disconnected');
+    }
+
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final options = Options(
+      sendTimeout: timeout ?? const Duration(seconds: 3),
+      receiveTimeout: timeout ?? const Duration(seconds: 3),
+    );
+
+    final response = method.toUpperCase() == 'GET'
+        ? await _dio.get('http://$_connectedIp$normalizedPath', options: options)
+        : await _dio.post('http://$_connectedIp$normalizedPath', data: body, options: options);
+
+    if (response.statusCode != 200 || response.data is! Map<String, dynamic>) {
+      throw Exception('Unexpected response from $normalizedPath');
+    }
+
+    return response.data as Map<String, dynamic>;
+  }
+
   void _updateState(TransportState newState) {
     _currentState = newState;
     _stateController.add(newState);
