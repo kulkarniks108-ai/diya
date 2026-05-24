@@ -52,6 +52,27 @@ class RegisterPhoneRequest(BaseModel):
     device_id: str | None = None
 
 
+async def _notify_ultrasonic_event(distance_cm: float, detected: bool) -> None:
+    if not state.phone_ip:
+        return
+
+    url = f"http://{state.phone_ip}:{state.phone_port}/events/ultrasonic"
+    payload = {
+        "device_id": state.device_id,
+        "distance_cm": distance_cm,
+        "detected": detected,
+        "ts": time.time(),
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+        _log("ultrasonic.notify.phone", distance_cm=distance_cm, detected=detected)
+    except Exception as exc:  # noqa: BLE001
+        _log("ultrasonic.notify.phone.failed", error=str(exc), distance_cm=distance_cm)
+
+
 def _log(event: str, **fields: object) -> None:
     payload = {
         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
@@ -101,6 +122,8 @@ async def update_state(update: StateUpdate) -> dict:
         state.battery_level = update.battery_level
     if update.ultrasonic_cm is not None:
         state.ultrasonic_cm = update.ultrasonic_cm
+        detected = state.ultrasonic_cm <= 120
+        await _notify_ultrasonic_event(state.ultrasonic_cm, detected)
     if update.stream_fps is not None:
         state.stream_fps = update.stream_fps
     if update.telemetry_hz is not None:
@@ -123,8 +146,16 @@ async def command(req: CommandRequest) -> JSONResponse:
         state.connected = True
     elif req.command == "disconnect":
         state.connected = False
+    elif req.command == "capture":
+        _log("capture.requested")
+        return JSONResponse({
+            "status": "ok",
+            "image_data_url": TINY_PNG_DATA_URL,
+            "captured_at": datetime.now(tz=timezone.utc).isoformat(),
+            "device_id": state.device_id,
+        })
 
-    _log("command", **state.last_command)
+    _log("command.phone", **state.last_command)
     return JSONResponse({"status": "ok", "received": state.last_command})
 
 
@@ -135,6 +166,8 @@ async def register_with_phone(req: RegisterPhoneRequest) -> JSONResponse:
     if "/" in phone_ip:
         phone_ip = phone_ip.split("/")[0]
     url = f"http://{phone_ip}:{req.port}/register"
+    state.phone_ip = phone_ip
+    state.phone_port = req.port
     payload = {
         "device_id": device_id,
         "device_type": "goggle",
