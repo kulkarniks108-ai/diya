@@ -10,6 +10,8 @@ from collections import deque
 class SimulatorState:
     device_id: str = "GOGGLE-SIM-001"
     connected: bool = False
+    phone_ip: str | None = None
+    phone_port: int = 8080
     battery_level: int = 92
     ultrasonic_cm: float = 120.0
     stream_fps: int = 8
