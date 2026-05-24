@@ -95,6 +95,44 @@ class HttpTransportImpl implements DeviceTransport {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Request raw bytes from the device. This is used for endpoints that return
+  /// binary payloads such as images. A maximum response size is enforced to
+  /// avoid OOMs. Returns the raw bytes on success.
+  Future<Uint8List> requestBytes(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Duration? timeout,
+    int maxResponseBytes = 4 * 1024 * 1024, // 4MB default
+  }) async {
+    if (_currentState != TransportState.connected || _connectedIp == null) {
+      throw Exception('Cannot request while disconnected');
+    }
+
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final options = Options(
+      sendTimeout: timeout ?? const Duration(seconds: 5),
+      receiveTimeout: timeout ?? const Duration(seconds: 5),
+      responseType: ResponseType.bytes,
+      validateStatus: (_) => true,
+    );
+
+    final response = method.toUpperCase() == 'GET'
+        ? await _dio.get('http://$_connectedIp$normalizedPath', options: options)
+        : await _dio.post('http://$_connectedIp$normalizedPath', data: body, options: options);
+
+    if (response.statusCode != 200 || response.data == null) {
+      throw Exception('Unexpected response from $normalizedPath: ${response.statusCode}');
+    }
+
+    final data = response.data as List<int>;
+    if (data.length > maxResponseBytes) {
+      throw Exception('Response too large: ${data.length} bytes (max $maxResponseBytes)');
+    }
+
+    return Uint8List.fromList(data);
+  }
+
   void _updateState(TransportState newState) {
     _currentState = newState;
     _stateController.add(newState);
