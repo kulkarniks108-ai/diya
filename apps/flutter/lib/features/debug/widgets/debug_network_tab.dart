@@ -38,10 +38,12 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
 
     try {
       if (Platform.isAndroid || Platform.isIOS) {
-        final status = await Permission.locationWhenInUse.request();
-        if (!status.isGranted) {
+        final locationStatus = await Permission.locationWhenInUse.request();
+        final wifiStatus = Platform.isAndroid ? await Permission.nearbyWifiDevices.request() : PermissionStatus.granted;
+
+        if (!locationStatus.isGranted || (Platform.isAndroid && !wifiStatus.isGranted)) {
           setState(() {
-            _wifiIP = 'Permission Denied';
+            _wifiIP = 'Permission denied (location/WiFi)';
             _isLoadingIP = false;
           });
           return;
@@ -49,9 +51,16 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
       }
 
       final ip = await _networkInfo.getWifiIP();
+      final fallbackIp = ip ?? await _getLocalIPv4();
       
       setState(() {
-        _wifiIP = ip ?? 'Unknown (Check WiFi)';
+        if (ip != null && ip.isNotEmpty) {
+          _wifiIP = ip;
+        } else if (fallbackIp != null) {
+          _wifiIP = '$fallbackIp (non-WiFi)';
+        } else {
+          _wifiIP = 'Unknown (Check WiFi/Hotspot and Location Services)';
+        }
       });
     } catch (e) {
       setState(() {
@@ -62,6 +71,22 @@ class _DebugNetworkTabState extends ConsumerState<DebugNetworkTab> {
         _isLoadingIP = false;
       });
     }
+  }
+
+  Future<String?> _getLocalIPv4() async {
+    try {
+      final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4, includeLoopback: false);
+      for (final interface in interfaces) {
+        for (final addr in interface.addresses) {
+          if (!addr.isLoopback && addr.address.isNotEmpty) {
+            return addr.address;
+          }
+        }
+      }
+    } catch (_) {
+      // Best effort; ignore and return null.
+    }
+    return null;
   }
 
   Future<void> _pingBackend() async {
