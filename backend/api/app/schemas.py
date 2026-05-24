@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 
 class UserSummary(BaseModel):
@@ -16,9 +16,20 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
     roles: list[str] = Field(default_factory=lambda: ["blind"])
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, roles: list[str]) -> list[str]:
+        allowed = {"blind", "family"}
+        if not roles:
+            return ["blind"]
+        invalid = [role for role in roles if role not in allowed]
+        if invalid:
+            raise ValueError("Unsupported role(s): " + ", ".join(invalid))
+        return roles
 
 
 class RefreshRequest(BaseModel):
