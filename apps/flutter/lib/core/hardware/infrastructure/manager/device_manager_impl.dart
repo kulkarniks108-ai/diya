@@ -54,6 +54,7 @@ class DeviceManagerImpl implements DeviceManager {
     final deviceId = data['device_id'] as String?;
     final deviceTypeStr = data['device_type'] as String?;
     final sourceIp = data['source_ip'] as String?;
+    final sourcePort = data['port'] as int?;
 
     if (deviceId == null || deviceTypeStr == null) return;
 
@@ -63,6 +64,7 @@ class DeviceManagerImpl implements DeviceManager {
       deviceId: deviceId,
       deviceType: type,
       lastKnownIp: sourceIp,
+      lastKnownPort: sourcePort,
       lastSeenTimestamp: DateTime.now(),
     );
 
@@ -147,9 +149,9 @@ class DeviceManagerImpl implements DeviceManager {
         _emitDevices();
 
         // Determine the address to connect to (IP for goggle, Mac for BLE cane)
-        final address = knownDevice.deviceType == DeviceType.goggle 
-            ? (knownDevice.lastKnownIp ?? '192.168.43.1')
-            : knownDevice.deviceId;
+        final address = knownDevice.deviceType == DeviceType.goggle
+          ? _buildGoggleAddress(knownDevice)
+          : knownDevice.deviceId;
 
         // Since adapter implements BaseDevice, we can directly connect
         await adapter.connect(address);
@@ -180,6 +182,12 @@ class DeviceManagerImpl implements DeviceManager {
 
   void _emitDevices() {
     _devicesController.add(_activeDevices.values.toList());
+  }
+
+  String _buildGoggleAddress(KnownDevice device) {
+    final host = device.lastKnownIp ?? '192.168.43.1';
+    final port = device.lastKnownPort ?? 80;
+    return '$host:$port';
   }
   
   void dispose() {
