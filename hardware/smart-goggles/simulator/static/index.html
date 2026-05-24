@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Goggle Simulator</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Smart Goggle Simulator</h1>
+    <div class="status" id="status">Disconnected</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Connection</h2>
+      <div class="row">
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn">Disconnect</button>
+      </div>
+      <div class="row">
+        <input id="phoneIp" placeholder="Phone IP" />
+        <button id="registerBtn">Register with Phone</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Telemetry</h2>
+      <label>Battery Level: <span id="batteryValue">92</span>%</label>
+      <input type="range" id="battery" min="0" max="100" value="92" />
+      <label>Ultrasonic (cm): <span id="ultraValue">120</span></label>
+      <input type="range" id="ultra" min="0" max="300" value="120" />
+      <label>Telemetry Hz: <span id="telemetryHzValue">2.0</span></label>
+      <input type="range" id="telemetryHz" min="1" max="10" value="2" />
+    </section>
+
+    <section class="card">
+      <h2>Camera Feed</h2>
+      <img id="frame" alt="frame" />
+      <label>Stream FPS: <span id="fpsValue">8</span></label>
+      <input type="range" id="fps" min="1" max="20" value="8" />
+    </section>
+
+    <section class="card">
+      <h2>Haptics</h2>
+      <div class="row">
+        <input id="hapticMs" type="number" min="10" max="2000" value="250" />
+        <button id="hapticBtn">Send Haptic</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Logs</h2>
+      <div class="row">
+        <button id="copyLogsBtn">Copy Logs</button>
+      </div>
+      <pre id="logs"></pre>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

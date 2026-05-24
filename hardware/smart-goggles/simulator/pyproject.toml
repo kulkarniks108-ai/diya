@@ -1,0 +1,16 @@
+[project]
+name = "goggle-simulator"
+version = "0.1.0"
+description = "Smart Goggle simulator for 2ndEye"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi>=0.136.1",
+  "uvicorn[standard]>=0.46.0",
+  "pydantic>=2.13.3",
+  "python-json-logger>=4.1.0",
+  "httpx>=0.28.1",
+]
+
+[tool.uv]
+package = false
