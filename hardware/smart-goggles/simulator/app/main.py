@@ -37,6 +37,7 @@ TINY_JPEG_BASE64 = (
 )
 
 TINY_JPEG_BYTES = base64.b64decode(TINY_JPEG_BASE64)
+TINY_JPEG_DATA_URL = f"data:image/jpeg;base64,{TINY_JPEG_BASE64}"
 
 
 class CommandRequest(BaseModel):
@@ -156,9 +157,12 @@ async def command(req: CommandRequest) -> JSONResponse:
         state.connected = False
     elif req.command == "capture":
         _log("capture.requested")
+        # Return a JPEG data-url for compatibility with older clients that expect
+        # a JSON payload containing an image_data_url. The binary /capture
+        # endpoint serves the same bytes as raw JPEG.
         return JSONResponse({
             "status": "ok",
-            "image_data_url": TINY_PNG_DATA_URL,
+            "image_data_url": TINY_JPEG_DATA_URL,
             "captured_at": datetime.now(tz=timezone.utc).isoformat(),
             "device_id": state.device_id,
         })
@@ -221,7 +225,9 @@ async def _frame_stream() -> AsyncGenerator[bytes, None]:
             "event": "frame",
             "frame_id": frame_id,
             "ts": time.time(),
-            "data_url": TINY_PNG_DATA_URL,
+            # Use JPEG data-url in frame stream as well so consumers see
+            # consistent image encoding.
+            "data_url": TINY_JPEG_DATA_URL,
             "battery_level": state.battery_level,
         }
         yield f"data: {json.dumps(payload)}\n\n".encode("utf-8")
