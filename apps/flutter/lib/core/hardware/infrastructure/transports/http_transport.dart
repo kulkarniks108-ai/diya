@@ -98,12 +98,13 @@ class HttpTransportImpl implements DeviceTransport {
   /// Request raw bytes from the device. This is used for endpoints that return
   /// binary payloads such as images. A maximum response size is enforced to
   /// avoid OOMs. Returns the raw bytes on success.
+  @override
   Future<Uint8List> requestBytes(
     String method,
     String path, {
     Map<String, dynamic>? body,
     Duration? timeout,
-    int maxResponseBytes = 4 * 1024 * 1024, // 4MB default
+    int? maxResponseBytes = 4 * 1024 * 1024, // 4MB default
   }) async {
     if (_currentState != TransportState.connected || _connectedIp == null) {
       throw Exception('Cannot request while disconnected');
