@@ -8,8 +8,10 @@ import 'dart:io';
 class DeviceDiscoveryServer {
   HttpServer? _server;
   final _registrationController = StreamController<Map<String, dynamic>>.broadcast();
+  final _sensorEventController = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get onDeviceRegistered => _registrationController.stream;
+  Stream<Map<String, dynamic>> get onSensorEvent => _sensorEventController.stream;
 
   Future<void> start({int port = 8080}) async {
     if (_server != null) return;
@@ -30,6 +32,22 @@ class DeviceDiscoveryServer {
           request.response.statusCode = HttpStatus.ok;
           request.response.headers.contentType = ContentType.json;
           request.response.write('{"status":"registered"}');
+        } catch (e) {
+          request.response.statusCode = HttpStatus.badRequest;
+        } finally {
+          await request.response.close();
+        }
+      } else if (request.uri.path == '/events/ultrasonic' && request.method == 'POST') {
+        final content = await utf8.decoder.bind(request).join();
+        try {
+          final data = jsonDecode(content) as Map<String, dynamic>;
+          data['source_ip'] = request.connectionInfo?.remoteAddress.address;
+          data['event_type'] = 'ultrasonic';
+          _sensorEventController.add(data);
+
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write('{"status":"received"}');
         } catch (e) {
           request.response.statusCode = HttpStatus.badRequest;
         } finally {
@@ -73,6 +91,12 @@ class DeviceDiscoveryServer {
   }
 
   Future<void> stop() async {
+    if (!_registrationController.isClosed) {
+      await _registrationController.close();
+    }
+    if (!_sensorEventController.isClosed) {
+      await _sensorEventController.close();
+    }
     await _server?.close(force: true);
     _server = null;
   }

@@ -69,3 +69,18 @@ class TelemetryEvent extends HardwareEvent {
     super.trusted,
   });
 }
+
+class UltrasonicDetectionEvent extends HardwareEvent {
+  final double distanceCm;
+  final bool detected;
+
+  UltrasonicDetectionEvent({
+    required super.deviceId,
+    required this.distanceCm,
+    required this.detected,
+    super.eventId,
+    super.timestamp,
+    super.priority,
+    super.trusted,
+  });
+}

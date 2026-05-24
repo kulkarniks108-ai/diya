@@ -2,6 +2,7 @@ import 'dart:async';
 import '../../domain/manager/device_manager.dart';
 import '../../domain/manager/device_registry.dart';
 import '../../domain/models/base_device.dart';
+import '../../domain/models/hardware_event.dart';
 import '../../domain/models/known_device.dart';
 import '../../domain/observability/hardware_log_event.dart';
 import '../observability/hardware_logger.dart';
@@ -25,6 +26,7 @@ class DeviceManagerImpl implements DeviceManager {
   final AdapterFactory _adapterFactory;
   final DeviceDiscoveryServer _discoveryServer;
   StreamSubscription? _discoverySubscription;
+  StreamSubscription? _sensorEventSubscription;
 
   final Map<String, BaseDevice> _activeDevices = {};
   final StreamController<List<BaseDevice>> _devicesController = StreamController.broadcast();
@@ -48,6 +50,7 @@ class DeviceManagerImpl implements DeviceManager {
     // Auto-start discovery server
     _discoveryServer.start();
     _discoverySubscription = _discoveryServer.onDeviceRegistered.listen(_handleDiscoveryEvent);
+    _sensorEventSubscription = _discoveryServer.onSensorEvent.listen(_handleSensorEvent);
   }
 
   Future<void> _handleDiscoveryEvent(Map<String, dynamic> data) async {
@@ -76,6 +79,34 @@ class DeviceManagerImpl implements DeviceManager {
     // Trigger connection
     _reconnectionAttempts[deviceId] = 0;
     _triggerReconnection(deviceId);
+  }
+
+  void _handleSensorEvent(Map<String, dynamic> data) {
+    final eventType = data['event_type'] as String?;
+    if (eventType != 'ultrasonic') return;
+
+    final deviceId = data['device_id'] as String?;
+    if (deviceId == null || deviceId.isEmpty) return;
+
+    final rawDistance = data['distance_cm'] ?? data['ultrasonic_cm'];
+    final distanceCm = rawDistance is num ? rawDistance.toDouble() : null;
+    if (distanceCm == null) return;
+
+    final detected = (data['detected'] as bool?) ?? true;
+
+    _logger.log(HardwareLogEvent(
+      type: LogType.stateTransition,
+      deviceId: deviceId,
+      message: 'Ultrasonic event: detected=$detected distance_cm=${distanceCm.toStringAsFixed(1)}',
+    ));
+
+    _eventBus.publish(UltrasonicDetectionEvent(
+      deviceId: deviceId,
+      distanceCm: distanceCm,
+      detected: detected,
+      priority: 1,
+      trusted: true,
+    ));
   }
 
   @override
@@ -191,8 +222,12 @@ class DeviceManagerImpl implements DeviceManager {
   }
   
   void dispose() {
-    for (final timer in _reconnectionTimers.values) timer.cancel();
+    for (final timer in _reconnectionTimers.values) {
+      timer.cancel();
+    }
     _reconnectionTimers.clear();
+    _discoverySubscription?.cancel();
+    _sensorEventSubscription?.cancel();
     _internalEvents.close();
     _devicesController.close();
   }
