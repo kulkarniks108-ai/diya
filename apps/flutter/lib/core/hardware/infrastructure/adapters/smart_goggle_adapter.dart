@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import '../../domain/models/base_device.dart';
 import '../../domain/models/connection_state.dart';
 import '../../domain/models/hardware_event.dart';
@@ -17,31 +19,60 @@ class _SmartGoggleCameraCapability implements CameraCapability {
   Type get type => CameraCapability;
 
   @override
-  Future<String?> capture() async {
+  Future<Uint8List?> capture() async {
     try {
+      // Primary: request raw bytes from /capture (binary JPEG)
+      try {
+        final bytes = await _transport.requestBytes('POST', '/capture');
+        // Basic validation: JPEG should begin with 0xFF 0xD8
+        if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
+          return bytes;
+        }
+        // If bytes are not valid JPEG, fallthrough to JSON fallback
+      } catch (_) {
+        // Ignore here; we'll attempt JSON fallback below and emit an error if both fail.
+      }
+
+      // Fallback: older devices return a JSON payload with data-url encoded image
       final response = await _transport.requestJson(
         'POST',
         '/command',
         body: {'command': 'capture'},
       );
-      final imageData = response['image_data_url'] as String?;
-      if (imageData != null && imageData.isNotEmpty) {
-        return imageData;
+      final imageDataUrl = response['image_data_url'] as String?;
+      String? encoded;
+      if (imageDataUrl != null && imageDataUrl.isNotEmpty) {
+        final comma = imageDataUrl.indexOf(',');
+        encoded = comma >= 0 ? imageDataUrl.substring(comma + 1) : imageDataUrl;
       }
 
       // Backward compatibility: older simulator wraps payload in "received".
-      final received = response['received'];
-      if (received is Map<String, dynamic>) {
-        final nested = received['image_data_url'] as String?;
-        if (nested != null && nested.isNotEmpty) {
-          return nested;
+      if (encoded == null || encoded.isEmpty) {
+        final received = response['received'];
+        if (received is Map<String, dynamic>) {
+          final nested = received['image_data_url'] as String?;
+          if (nested != null && nested.isNotEmpty) {
+            final comma = nested.indexOf(',');
+            encoded = comma >= 0 ? nested.substring(comma + 1) : nested;
+          }
+        }
+      }
+
+      if (encoded != null && encoded.isNotEmpty) {
+        try {
+          final bytes = base64Decode(encoded);
+          if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
+            return bytes;
+          }
+        } catch (_) {
+          // decode failed
         }
       }
 
       _eventBus.publish(HardwareErrorEvent(
         deviceId: _deviceId,
         errorCode: 'capture_empty',
-        message: 'Capture command returned no image payload',
+        message: 'Capture command returned no valid image payload',
         priority: 2,
         trusted: true,
       ));
