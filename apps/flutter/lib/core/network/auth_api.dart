@@ -60,6 +60,18 @@ class AuthApi {
     }
   }
 
+  Future<AuthSession> register({required String email, required String password, required List<String> roles}) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/register',
+        data: <String, Object?>{'email': email, 'password': password, 'roles': roles},
+      );
+      return _parseSession(_extractData(response.data));
+    } on Object catch (error) {
+      throw AppErrorMapper.fromException(error, fallbackType: AppErrorType.auth);
+    }
+  }
+
   Future<void> logout({required String accessToken}) async {
     try {
       await _dio.post<void>(

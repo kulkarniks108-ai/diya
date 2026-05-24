@@ -111,6 +111,21 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> signUp({required String email, required String password, required List<String> roles}) async {
+    _state = SessionState(status: AuthStatus.refreshing, session: _state.session);
+    notifyListeners();
+
+    try {
+      final session = await _authApi.register(email: email, password: password, roles: roles);
+      await _sessionRepository.save(session);
+      _state = SessionState(status: AuthStatus.authenticated, session: session);
+    } on AppError catch (error) {
+      _state = SessionState(status: AuthStatus.error, error: error);
+    }
+
+    notifyListeners();
+  }
+
   Future<void> refreshSession() async {
     return _refreshLock.acquire(() async {
       final currentSession = _state.session;
