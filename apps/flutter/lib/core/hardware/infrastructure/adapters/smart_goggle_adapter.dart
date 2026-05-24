@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import '../../domain/models/base_device.dart';
 import '../../domain/models/connection_state.dart';
@@ -28,7 +29,21 @@ class _SmartGoggleCameraCapability implements CameraCapability {
         if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
           return bytes;
         }
-        // If bytes are not valid JPEG, fallthrough to JSON fallback
+          // If bytes are not valid JPEG, persist diagnostics and fallthrough to JSON fallback
+          try {
+            final tmp = Directory.systemTemp;
+            final file = File('${tmp.path}/capture_${_deviceId}_${DateTime.now().microsecondsSinceEpoch}.bin');
+            await file.writeAsBytes(bytes, flush: true);
+            _eventBus.publish(HardwareErrorEvent(
+              deviceId: _deviceId,
+              errorCode: 'capture_bad_image',
+              message: 'Capture returned invalid JPEG; wrote diagnostics to ${file.path}',
+              priority: 1,
+              trusted: true,
+            ));
+          } catch (_) {
+            // ignore failures in diagnostic write
+          }
       } catch (_) {
         // Ignore here; we'll attempt JSON fallback below and emit an error if both fail.
       }

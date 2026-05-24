@@ -126,7 +126,21 @@ class HttpTransportImpl implements DeviceTransport {
       throw Exception('Unexpected response from $normalizedPath: ${response.statusCode}');
     }
 
-    final data = response.data as List<int>;
+    // Ensure the server returned an image-like content-type. If not, try to
+    // decode payload as UTF8 and include it in the exception to help debugging.
+    final contentType = response.headers.value('content-type') ?? '';
+    final raw = response.data;
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      // If the server returned JSON or text, return a helpful error with body
+      try {
+        final asUtf8 = raw is List<int> ? String.fromCharCodes(raw) : raw.toString();
+        throw Exception('Unexpected content-type from $normalizedPath: $contentType, body: $asUtf8');
+      } catch (e) {
+        throw Exception('Unexpected non-image content from $normalizedPath: $contentType');
+      }
+    }
+
+    final data = raw is List<int> ? raw : (raw is Uint8List ? raw.toList() : <int>[]);
     if (maxResponseBytes != null && data.length > maxResponseBytes) {
       throw Exception('Response too large: ${data.length} bytes (max $maxResponseBytes)');
     }
