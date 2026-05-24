@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import time
@@ -9,7 +10,7 @@ from typing import AsyncGenerator, Dict
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -29,6 +30,13 @@ TINY_PNG_DATA_URL = (
     "data:image/png;base64,"
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQI12P4//8/AwAI/AL+XzF+6QAAAABJRU5ErkJggg=="
 )
+
+# A minimal 1x1 JPEG used for simulator binary capture responses. Kept small for tests.
+TINY_JPEG_BASE64 = (
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAPDw8PDw8PDw8PDw8PDw8PDw8PFREWFhURFRUYHSggGBolGxUVITEhJSkrLi4uFx8zODMtNygtLisBCgoKDg0OGxAQGy0lICUtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAJ8BPgMBIgACEQEDEQH/xAAcAAEAAgMBAQEAAAAAAAAAAAAABAUCAwYBBwj/xABEEAACAQIDBAYFBQcCBwAAAAAAAQIDEQQSIQUGMUFREyJhcYGRBxQjkaGx0SNS4SNCUmLwJDNzssI1coOj/8QAGQEBAAMBAQAAAAAAAAAAAAAAAAEDBAIF/8QAJhEBAAICAQMDBQEAAAAAAAAAAAECAxESITFBEyJBYaEyQnGh/9oADAMBAAIRAxEAPwD3wREQEREBERAEREBERAEREBERAEREBERAEREBERAEREH/2Q=="
+)
+
+TINY_JPEG_BYTES = base64.b64decode(TINY_JPEG_BASE64)
 
 
 class CommandRequest(BaseModel):
@@ -154,6 +162,21 @@ async def command(req: CommandRequest) -> JSONResponse:
             "captured_at": datetime.now(tz=timezone.utc).isoformat(),
             "device_id": state.device_id,
         })
+
+
+@app.post('/capture')
+async def capture_raw() -> Response:
+    """Return a raw JPEG bytes payload. This models how an ESP32 camera would return a binary JPEG.
+
+    The endpoint intentionally returns a small JPEG for development and testing. The response
+    includes basic logging: content-length and a hex prefix of the first bytes.
+    """
+    payload = TINY_JPEG_BYTES
+    _log("capture.raw.requested", size=len(payload))
+    # Log a short hex prefix for quick diagnostics (first 8 bytes)
+    hex_prefix = payload[:8].hex()
+    logger.info("capture.raw.respond", extra={"size": len(payload), "hex_prefix": hex_prefix})
+    return Response(content=payload, media_type="image/jpeg")
 
     _log("command.phone", **state.last_command)
     return JSONResponse({"status": "ok", "received": state.last_command})
