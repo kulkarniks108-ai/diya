@@ -127,7 +127,7 @@ class HttpTransportImpl implements DeviceTransport {
     }
 
     final data = response.data as List<int>;
-    if (data.length > maxResponseBytes) {
+    if (maxResponseBytes != null && data.length > maxResponseBytes) {
       throw Exception('Response too large: ${data.length} bytes (max $maxResponseBytes)');
     }
 
