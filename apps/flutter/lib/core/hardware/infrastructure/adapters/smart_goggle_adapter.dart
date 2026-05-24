@@ -79,8 +79,25 @@ class _SmartGoggleCameraCapability implements CameraCapability {
           if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
             return bytes;
           }
-        } catch (_) {
-          // decode failed
+          // attempt to persist diagnostics
+          try {
+            final tmp = Directory.systemTemp;
+            final file = File('${tmp.path}/capture_bad_${_deviceId}_${DateTime.now().microsecondsSinceEpoch}.bin');
+            await file.writeAsBytes(bytes, flush: true);
+            _eventBus.publish(HardwareErrorEvent(
+              deviceId: _deviceId,
+              errorCode: 'capture_bad_image',
+              message: 'Capture returned invalid JPEG; diagnostics: ${file.path}',
+              priority: 1,
+              trusted: true,
+            ));
+            throw Exception('capture_failed: invalid image saved to ${file.path}');
+          } catch (_) {
+            throw Exception('capture_failed: invalid image received and diagnostics write failed');
+          }
+        } catch (e) {
+          // decode failed or other error
+          throw Exception('capture_failed: ${e}');
         }
       }
 
@@ -91,7 +108,7 @@ class _SmartGoggleCameraCapability implements CameraCapability {
         priority: 2,
         trusted: true,
       ));
-      return null;
+      throw Exception('capture_failed: no valid payload returned');
     } catch (e) {
       _eventBus.publish(HardwareErrorEvent(
         deviceId: _deviceId,
@@ -100,7 +117,7 @@ class _SmartGoggleCameraCapability implements CameraCapability {
         priority: 1,
         trusted: true,
       ));
-      return null;
+      throw Exception('capture_failed: $e');
     }
   }
 }
