@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -204,13 +206,35 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
       }
 
       if (!mounted) return;
-      setState(() {
-        if (bytes == null || bytes.isEmpty) {
-          _captureError = 'No image returned by device';
-          return;
+      // Validate image bytes by attempting to instantiate an image codec.
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) setState(() => _captureError = 'No image returned by device');
+        return;
+      }
+
+      try {
+        // This will throw if the image bytes cannot be decoded.
+        await ui.instantiateImageCodec(bytes);
+        if (!mounted) return;
+        setState(() {
+          _captureImageBytes = bytes;
+        });
+      } catch (e) {
+        // Persist diagnostic file to system temp for offline inspection.
+        String diagPath = 'unknown';
+        try {
+          final tmp = Directory.systemTemp;
+          final file = File('${tmp.path}/capture_diag_${widget.deviceId}_${DateTime.now().microsecondsSinceEpoch}.bin');
+          await file.writeAsBytes(bytes, flush: true);
+          diagPath = file.path;
+        } catch (_) {
+          // Ignore any write failures; keep diagPath as unknown.
         }
-        _captureImageBytes = bytes;
-      });
+
+        final msg = 'Invalid image data: ${e} (diagnostic: $diagPath)';
+        print(msg);
+        if (mounted) setState(() => _captureError = msg);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
