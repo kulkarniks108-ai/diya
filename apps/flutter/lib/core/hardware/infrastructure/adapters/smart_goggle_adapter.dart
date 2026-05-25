@@ -40,7 +40,7 @@ class _SmartGoggleCameraCapability implements CameraCapability {
           priority: 1,
           trusted: true,
         ));
-        throw Exception('capture_failed: invalid image saved to $diagPath');
+        return null;
       }
 
       _eventBus.publish(HardwareErrorEvent(
@@ -50,7 +50,7 @@ class _SmartGoggleCameraCapability implements CameraCapability {
         priority: 1,
         trusted: true,
       ));
-      throw Exception('capture_failed: invalid image received and diagnostics write failed');
+      return null;
     } catch (e) {
       _eventBus.publish(HardwareErrorEvent(
         deviceId: _deviceId,
@@ -59,7 +59,7 @@ class _SmartGoggleCameraCapability implements CameraCapability {
         priority: 1,
         trusted: true,
       ));
-      throw Exception('capture_failed: $e');
+      return null;
     }
   }
 
