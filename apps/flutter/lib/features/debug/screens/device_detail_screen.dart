@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,8 +25,6 @@ class DeviceDetailScreen extends ConsumerStatefulWidget {
 
 class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   static const Duration _reachabilityFreshness = Duration(seconds: 8);
-  static const Duration _requestTimeout = Duration(seconds: 3);
-
   KnownDevice? _knownDevice;
   String? _pingResult;
   Color _pingColor = Colors.grey;
@@ -82,61 +79,19 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     }
   }
 
-  Dio _buildDio() {
-    return Dio(BaseOptions(connectTimeout: _requestTimeout, receiveTimeout: _requestTimeout));
-  }
-
-  Uri? _knownDeviceUri(String path) {
-    final known = _knownDevice;
-    final host = known?.lastKnownIp;
-    if (known == null || host == null) return null;
-    final port = known.lastKnownPort ?? 80;
-    return Uri.parse('http://$host:$port$path');
-  }
-
-  Future<Map<String, dynamic>> _requestKnownDeviceJson(
-    String method,
-    String path, {
-    Map<String, dynamic>? body,
-  }) async {
-    final uri = _knownDeviceUri(path);
-    if (uri == null) {
-      throw StateError('Known device endpoint is unavailable');
-    }
-
-    final dio = _buildDio();
-    final response = method.toUpperCase() == 'GET'
-        ? await dio.getUri(uri)
-        : await dio.postUri(uri, data: body);
-
-    if (response.statusCode != 200 || response.data is! Map<String, dynamic>) {
-      throw StateError('Unexpected response from $path');
-    }
-
-    return response.data as Map<String, dynamic>;
-  }
-
   Future<void> _fetchTelemetry() async {
     final known = _knownDevice;
     if (known == null || known.deviceType != DeviceType.goggle) {
       return;
     }
-    final uri = _knownDeviceUri('/state');
-    if (uri == null) {
-      return;
-    }
-
-    try {
-      final response = await _buildDio().getUri(uri);
-      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
-        final data = response.data as Map<String, dynamic>;
-        setState(() {
-          _ultrasonicCm = (data['ultrasonic_cm'] as num?)?.toDouble() ?? _ultrasonicCm;
-          _lastReachableAt = DateTime.now();
-        });
-      }
-    } catch (_) {
-      // Best effort; ignore transient errors.
+    final service = ref.read(debugGoggleServiceProvider);
+    final ultrasonic = await service.fetchUltrasonicCm(known);
+    if (!mounted) return;
+    if (ultrasonic != null) {
+      setState(() {
+        _ultrasonicCm = ultrasonic;
+        _lastReachableAt = DateTime.now();
+      });
     }
   }
 
@@ -153,9 +108,10 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
       if (capability != null) {
         level = await capability.pullBatteryLevel();
       } else {
-        final data = await _requestKnownDeviceJson('GET', '/state');
-        final battery = data['battery_level'];
-        level = battery is num ? battery.toInt().clamp(0, 100) : null;
+        final known = _knownDevice;
+        if (known == null) return;
+        final service = ref.read(debugGoggleServiceProvider);
+        level = await service.pullBatteryLevel(known);
       }
       if (!mounted) return;
       setState(() {
@@ -183,18 +139,13 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
 
     try {
       Uint8List? bytes;
-      String? responseMeta;
       if (capability != null) {
         bytes = await capability.capture();
       } else {
-        // Snapshot-only: GET /capture for JPEG bytes.
-        final uri = _knownDeviceUri('/capture');
-        if (uri != null) {
-          final resp = await _buildDio().getUri(uri, options: Options(responseType: ResponseType.bytes));
-          if (resp.statusCode == 200 && resp.data is List<int>) {
-            bytes = Uint8List.fromList(resp.data as List<int>);
-          }
-          responseMeta = 'status=${resp.statusCode} content-type=${resp.headers.value('content-type') ?? 'unknown'}';
+        final known = _knownDevice;
+        if (known != null) {
+          final service = ref.read(debugGoggleServiceProvider);
+          bytes = await service.capture(known);
         }
       }
 
@@ -234,9 +185,6 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
         final msg = 'Invalid image data: ${e} (diagnostic: $diagPath)';
         debugPrint('capture.decode.failed: $msg');
         debugPrint('capture.decode.failed: len=${bytes.length} hex=${hexPrefix} ascii=${asciiPrefix}');
-        if (responseMeta != null) {
-          debugPrint('capture.decode.failed: response=${responseMeta}');
-        }
         if (mounted) {
           setState(() {
             _captureError = msg;
@@ -311,8 +259,11 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     if (known == null) {
       return;
     }
-    final uri = _knownDeviceUri('/health');
-    if (uri == null) {
+    if (known.deviceType != DeviceType.goggle) {
+      setState(() {
+        _pingResult = 'UNSUPPORTED';
+        _pingColor = Colors.grey;
+      });
       return;
     }
 
@@ -323,8 +274,9 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     });
 
     try {
-      final response = await _buildDio().getUri(uri);
-      if (response.statusCode == 200) {
+      final service = ref.read(debugGoggleServiceProvider);
+      final ok = await service.ping(known);
+      if (ok) {
         setState(() {
           _pingResult = 'OK';
           _pingColor = Colors.green;
@@ -332,15 +284,10 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
         });
       } else {
         setState(() {
-          _pingResult = 'FAILED (${response.statusCode})';
+          _pingResult = 'FAILED';
           _pingColor = Colors.red;
         });
       }
-    } on DioException catch (e) {
-      setState(() {
-        _pingResult = 'FAILED: ${e.message}';
-        _pingColor = Colors.red;
-      });
     } catch (e) {
       setState(() {
         _pingResult = 'FAILED: $e';

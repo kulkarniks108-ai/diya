@@ -12,6 +12,7 @@ import '../infrastructure/manager/backoff_strategy.dart';
 import '../infrastructure/manager/device_manager_impl.dart';
 import '../infrastructure/manager/shared_prefs_device_registry.dart';
 import '../infrastructure/observability/hardware_logger.dart';
+import '../infrastructure/services/debug_goggle_service.dart';
 import '../infrastructure/transports/device_discovery_server.dart';
 
 // ──────────────────────────────────────────────────────────────
@@ -78,6 +79,14 @@ final adapterFactoryProvider = Provider<AdapterFactory>((ref) {
   final dio = ref.watch(dioProvider);
   final eventBus = ref.watch(hardwareEventBusProvider);
   return AdapterFactory(dio, eventBus);
+});
+
+final debugGoggleServiceProvider = Provider<DebugGoggleService>((ref) {
+  final dio = ref.watch(dioProvider);
+  final eventBus = ref.watch(hardwareEventBusProvider);
+  final service = DebugGoggleService(dio, eventBus);
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 // ──────────────────────────────────────────────────────────────
