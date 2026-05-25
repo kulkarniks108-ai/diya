@@ -57,7 +57,7 @@ class DeviceManagerImpl implements DeviceManager {
     final deviceId = data['device_id'] as String?;
     final deviceTypeStr = data['device_type'] as String?;
     final sourceIp = data['source_ip'] as String?;
-    final sourcePort = data['port'] as int?;
+    final advertisedPort = data['port'] as int?;
 
     if (deviceId == null || deviceTypeStr == null) return;
 
@@ -67,7 +67,7 @@ class DeviceManagerImpl implements DeviceManager {
       deviceId: deviceId,
       deviceType: type,
       lastKnownIp: sourceIp,
-      lastKnownPort: sourcePort,
+      lastKnownPort: advertisedPort,
       lastSeenTimestamp: DateTime.now(),
     );
 

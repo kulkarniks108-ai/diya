@@ -1,8 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,7 +40,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
   double? _ultrasonicCm;
   Timer? _telemetryTimer;
   bool _isCapturing = false;
-  String? _captureImageDataUrl;
+  Uint8List? _captureImageBytes;
   String? _captureError;
   bool _hasRequestedRetry = false;
 
@@ -176,28 +178,77 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     setState(() {
       _isCapturing = true;
       _captureError = null;
+      _captureImageBytes = null;
     });
 
     try {
-      final String? imageDataUrl;
+      Uint8List? bytes;
+      String? responseMeta;
       if (capability != null) {
-        imageDataUrl = await capability.capture();
+        bytes = await capability.capture();
       } else {
-        final response = await _requestKnownDeviceJson('POST', '/command', body: {'command': 'capture'});
-        imageDataUrl = response['image_data_url'] as String?;
-      }
-      if (!mounted) return;
-      setState(() {
-        if (imageDataUrl == null || imageDataUrl.isEmpty) {
-          _captureError = 'No image returned by device';
-          return;
+        // Snapshot-only: GET /capture for JPEG bytes.
+        final uri = _knownDeviceUri('/capture');
+        if (uri != null) {
+          final resp = await _buildDio().getUri(uri, options: Options(responseType: ResponseType.bytes));
+          if (resp.statusCode == 200 && resp.data is List<int>) {
+            bytes = Uint8List.fromList(resp.data as List<int>);
+          }
+          responseMeta = 'status=${resp.statusCode} content-type=${resp.headers.value('content-type') ?? 'unknown'}';
         }
-        _captureImageDataUrl = imageDataUrl;
-      });
+      }
+
+      if (!mounted) return;
+      // Validate image bytes by attempting to instantiate an image codec.
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) setState(() => _captureError = 'No image returned by device');
+        return;
+      }
+
+      try {
+        // Decode a frame to ensure the bytes are actually renderable.
+        final codec = await ui.instantiateImageCodec(bytes);
+        try {
+          await codec.getNextFrame();
+        } finally {
+          codec.dispose();
+        }
+        if (!mounted) return;
+        setState(() {
+          _captureImageBytes = bytes;
+        });
+      } catch (e) {
+        final hexPrefix = _hexPrefix(bytes, 24);
+        final asciiPrefix = _asciiPrefix(bytes, 64);
+        // Persist diagnostic file to system temp for offline inspection.
+        String diagPath = 'unknown';
+        try {
+          final tmp = Directory.systemTemp;
+          final file = File('${tmp.path}/capture_diag_${widget.deviceId}_${DateTime.now().microsecondsSinceEpoch}.bin');
+          await file.writeAsBytes(bytes, flush: true);
+          diagPath = file.path;
+        } catch (_) {
+          // Ignore any write failures; keep diagPath as unknown.
+        }
+
+        final msg = 'Invalid image data: ${e} (diagnostic: $diagPath)';
+        debugPrint('capture.decode.failed: $msg');
+        debugPrint('capture.decode.failed: len=${bytes.length} hex=${hexPrefix} ascii=${asciiPrefix}');
+        if (responseMeta != null) {
+          debugPrint('capture.decode.failed: response=${responseMeta}');
+        }
+        if (mounted) {
+          setState(() {
+            _captureError = msg;
+            _captureImageBytes = null;
+          });
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _captureError = '$e';
+        _captureImageBytes = null;
       });
     } finally {
       if (mounted) {
@@ -206,16 +257,27 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     }
   }
 
-  Uint8List? _decodeDataUrl(String? dataUrl) {
-    if (dataUrl == null || dataUrl.isEmpty) return null;
-    final commaIndex = dataUrl.indexOf(',');
-    if (commaIndex < 0 || commaIndex == dataUrl.length - 1) return null;
-    final encoded = dataUrl.substring(commaIndex + 1);
-    try {
-      return base64Decode(encoded);
-    } catch (_) {
-      return null;
+  String _hexPrefix(Uint8List bytes, int max) {
+    final len = bytes.length < max ? bytes.length : max;
+    final buffer = StringBuffer();
+    for (var i = 0; i < len; i++) {
+      buffer.write(bytes[i].toRadixString(16).padLeft(2, '0'));
     }
+    return buffer.toString();
+  }
+
+  String _asciiPrefix(Uint8List bytes, int max) {
+    final len = bytes.length < max ? bytes.length : max;
+    final buffer = StringBuffer();
+    for (var i = 0; i < len; i++) {
+      final b = bytes[i];
+      if (b >= 32 && b <= 126) {
+        buffer.writeCharCode(b);
+      } else {
+        buffer.write('.');
+      }
+    }
+    return buffer.toString();
   }
 
   bool get _hasRecentReachability {
@@ -551,11 +613,23 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Builder(builder: (context) {
-                      final imageBytes = _decodeDataUrl(_captureImageDataUrl);
+                      final imageBytes = _captureImageBytes;
                       if (imageBytes != null) {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(imageBytes, fit: BoxFit.cover),
+                          child: Image.memory(
+                            imageBytes,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Text(
+                                  'Image decode failed: $error',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace'),
+                                ),
+                              );
+                            },
+                          ),
                         );
                       }
 

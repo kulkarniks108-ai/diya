@@ -49,6 +49,17 @@ class BleTransportImpl implements DeviceTransport {
     throw UnsupportedError('requestJson is not supported for BLE transport');
   }
 
+  @override
+  Future<Uint8List> requestBytes(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Duration? timeout,
+    int? maxResponseBytes,
+  }) {
+    throw UnsupportedError('requestBytes is not supported for BLE transport');
+  }
+
   void _updateState(TransportState newState) {
     _currentState = newState;
     _stateController.add(newState);

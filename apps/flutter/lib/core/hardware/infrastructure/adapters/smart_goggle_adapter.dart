@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import '../../domain/capabilities/device_capability.dart';
+import '../../domain/messaging/event_bus.dart';
 import '../../domain/models/base_device.dart';
 import '../../domain/models/connection_state.dart';
 import '../../domain/models/hardware_event.dart';
-import '../../domain/capabilities/device_capability.dart';
 import '../../domain/transports/device_transport.dart';
-import '../../domain/messaging/event_bus.dart';
 
 class _SmartGoggleCameraCapability implements CameraCapability {
   final DeviceTransport _transport;
@@ -16,36 +19,38 @@ class _SmartGoggleCameraCapability implements CameraCapability {
   @override
   Type get type => CameraCapability;
 
+  bool _isSupportedImageBytes(Uint8List bytes) {
+    return bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
+  }
+
   @override
-  Future<String?> capture() async {
+  Future<Uint8List?> capture() async {
     try {
-      final response = await _transport.requestJson(
-        'POST',
-        '/command',
-        body: {'command': 'capture'},
-      );
-      final imageData = response['image_data_url'] as String?;
-      if (imageData != null && imageData.isNotEmpty) {
-        return imageData;
+      final bytes = await _transport.requestBytes('GET', '/capture');
+      if (_isSupportedImageBytes(bytes)) {
+        return bytes;
       }
 
-      // Backward compatibility: older simulator wraps payload in "received".
-      final received = response['received'];
-      if (received is Map<String, dynamic>) {
-        final nested = received['image_data_url'] as String?;
-        if (nested != null && nested.isNotEmpty) {
-          return nested;
-        }
+      final diagPath = await _writeDiagnostic(bytes, 'capture');
+      if (diagPath != null) {
+        _eventBus.publish(HardwareErrorEvent(
+          deviceId: _deviceId,
+          errorCode: 'capture_bad_image',
+          message: 'Capture returned invalid image; wrote diagnostics to $diagPath',
+          priority: 1,
+          trusted: true,
+        ));
+        throw Exception('capture_failed: invalid image saved to $diagPath');
       }
 
       _eventBus.publish(HardwareErrorEvent(
         deviceId: _deviceId,
-        errorCode: 'capture_empty',
-        message: 'Capture command returned no image payload',
-        priority: 2,
+        errorCode: 'capture_bad_image',
+        message: 'Capture returned invalid image and diagnostics write failed',
+        priority: 1,
         trusted: true,
       ));
-      return null;
+      throw Exception('capture_failed: invalid image received and diagnostics write failed');
     } catch (e) {
       _eventBus.publish(HardwareErrorEvent(
         deviceId: _deviceId,
@@ -54,8 +59,38 @@ class _SmartGoggleCameraCapability implements CameraCapability {
         priority: 1,
         trusted: true,
       ));
-      return null;
+      throw Exception('capture_failed: $e');
     }
+  }
+
+  Future<String?> _writeDiagnostic(Uint8List bytes, String prefix) async {
+    final candidates = <String>[];
+    try {
+      candidates.add(Directory.systemTemp.path);
+    } catch (_) {}
+    candidates.addAll([
+      '/sdcard/Download',
+      '/storage/emulated/0/Download',
+    ]);
+
+    for (final base in candidates) {
+      try {
+        final dir = Directory(base);
+        if (!await dir.exists()) {
+          try {
+            await dir.create(recursive: true);
+          } catch (_) {
+            continue;
+          }
+        }
+        final file = File('${dir.path}/${prefix}_${_deviceId}_${DateTime.now().microsecondsSinceEpoch}.bin');
+        await file.writeAsBytes(bytes, flush: true);
+        return file.path;
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
   }
 }
 
@@ -101,7 +136,7 @@ class SmartGoggleAdapter implements BaseDevice {
   final String _id;
   final DeviceTransport _transport;
   final HardwareEventBus _eventBus;
-  
+
   HardwareConnectionState _state = HardwareConnectionState.idle;
   late final List<DeviceCapability> _capabilities;
 
