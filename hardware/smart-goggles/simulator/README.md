@@ -18,3 +18,4 @@ Then open:
 - To register with the phone discovery server, use the UI "Register with Phone" action.
 - The simulator emits SSE streams for frames and telemetry.
 - Logging is structured and shown in the UI log pane.
+- `/capture` returns a live webcam JPEG snapshot on each request. Use `?camera_index=1` to pick a different camera (default 0).

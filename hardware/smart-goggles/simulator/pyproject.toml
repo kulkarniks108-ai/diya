@@ -10,6 +10,7 @@ dependencies = [
   "pydantic>=2.13.3",
   "python-json-logger>=4.1.0",
   "httpx>=0.28.1",
+  "opencv-python>=4.10.0.84",
 ]
 
 [tool.uv]

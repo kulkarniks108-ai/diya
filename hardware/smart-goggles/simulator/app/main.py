@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import logging
 import time
@@ -9,6 +8,10 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator, Dict
 
 import httpx
+try:
+    import cv2
+except Exception:  # noqa: BLE001
+    cv2 = None
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -26,18 +29,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 state = SimulatorState()
 logs = LogBuffer()
 
-# A minimal 1x1 JPEG used for simulator binary capture responses. Kept small for tests.
-TINY_JPEG_BASE64 = (
-    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/"
-    "2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/"
-    "wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKB"
-    "kaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ip"
-    "qrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcF"
-    "BAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3"
-    "eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7LooooA//2Q=="
-)
-
-TINY_JPEG_BYTES = base64.b64decode(TINY_JPEG_BASE64)
+CAMERA_INDEX = 0
+JPEG_QUALITY = 85
 
 
 class CommandRequest(BaseModel):
@@ -99,6 +92,23 @@ def _jpeg_magic_ok(payload: bytes) -> bool:
 
 def _request_id() -> str:
     return f"sim-{int(time.time() * 1000)}"
+
+
+def _capture_webcam_jpeg(camera_index: int) -> bytes:
+    if cv2 is None:
+        raise RuntimeError("OpenCV not available. Run 'uv sync' to install opencv-python.")
+    camera = cv2.VideoCapture(camera_index)
+    if not camera.isOpened():
+        camera.release()
+        raise RuntimeError("Failed to open webcam")
+    ok, frame = camera.read()
+    camera.release()
+    if not ok or frame is None:
+        raise RuntimeError("Failed to read webcam frame")
+    encode_ok, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
+    if not encode_ok:
+        raise RuntimeError("Failed to encode webcam frame")
+    return buffer.tobytes()
 
 
 @app.get("/")
@@ -169,16 +179,30 @@ async def command(req: CommandRequest) -> JSONResponse:
 
 
 @app.api_route('/capture', methods=["GET", "POST"])
-async def capture_raw(request: Request) -> Response:
+async def capture_raw(request: Request, camera_index: int = CAMERA_INDEX) -> Response:
     """Return a raw JPEG bytes payload for snapshot capture."""
     req_id = _request_id()
-    payload = TINY_JPEG_BYTES
     client_host = request.client.host if request.client else "unknown"
+    if camera_index < 0:
+        raise HTTPException(status_code=422, detail="camera_index must be >= 0")
+    try:
+        payload = _capture_webcam_jpeg(camera_index)
+    except Exception as exc:  # noqa: BLE001
+        _log(
+            "capture.raw.failed",
+            request_id=req_id,
+            client=client_host,
+            method=request.method,
+            camera_index=camera_index,
+            error=str(exc),
+        )
+        raise HTTPException(status_code=503, detail=f"Webcam capture failed: {exc}") from exc
     _log(
         "capture.raw.requested",
         request_id=req_id,
         client=client_host,
         method=request.method,
+        camera_index=camera_index,
         size=len(payload),
     )
     if not _jpeg_magic_ok(payload):
@@ -187,7 +211,13 @@ async def capture_raw(request: Request) -> Response:
     hex_prefix = payload[:16].hex()
     logger.info(
         "capture.raw.respond",
-        extra={"request_id": req_id, "size": len(payload), "hex_prefix": hex_prefix, "client": client_host},
+        extra={
+            "request_id": req_id,
+            "size": len(payload),
+            "hex_prefix": hex_prefix,
+            "client": client_host,
+            "camera_index": camera_index,
+        },
     )
     headers = {
         "Cache-Control": "no-store",
