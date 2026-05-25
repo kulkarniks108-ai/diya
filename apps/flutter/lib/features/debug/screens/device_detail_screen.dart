@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -188,24 +187,14 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
       if (capability != null) {
         bytes = await capability.capture();
       } else {
-        // Prefer binary /capture endpoint; fall back to JSON /command
-        try {
-          final uri = _knownDeviceUri('/capture');
-          if (uri != null) {
-            final resp = await _buildDio().postUri(uri, options: Options(responseType: ResponseType.bytes));
-            if (resp.statusCode == 200 && resp.data is List<int>) {
-              bytes = Uint8List.fromList(resp.data as List<int>);
-            }
-            responseMeta = 'status=${resp.statusCode} content-type=${resp.headers.value('content-type') ?? 'unknown'}';
+        // Snapshot-only: GET /capture for JPEG bytes.
+        final uri = _knownDeviceUri('/capture');
+        if (uri != null) {
+          final resp = await _buildDio().getUri(uri, options: Options(responseType: ResponseType.bytes));
+          if (resp.statusCode == 200 && resp.data is List<int>) {
+            bytes = Uint8List.fromList(resp.data as List<int>);
           }
-        } catch (_) {
-          // ignore and try JSON fallback
-        }
-
-        if (bytes == null) {
-          final response = await _requestKnownDeviceJson('POST', '/command', body: {'command': 'capture'});
-          final imageDataUrl = response['image_data_url'] as String?;
-          bytes = _decodeDataUrl(imageDataUrl);
+          responseMeta = 'status=${resp.statusCode} content-type=${resp.headers.value('content-type') ?? 'unknown'}';
         }
       }
 
@@ -265,18 +254,6 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
       if (mounted) {
         setState(() => _isCapturing = false);
       }
-    }
-  }
-
-  Uint8List? _decodeDataUrl(String? dataUrl) {
-    if (dataUrl == null || dataUrl.isEmpty) return null;
-    final commaIndex = dataUrl.indexOf(',');
-    if (commaIndex < 0 || commaIndex == dataUrl.length - 1) return null;
-    final encoded = dataUrl.substring(commaIndex + 1);
-    try {
-      return base64Decode(encoded);
-    } catch (_) {
-      return null;
     }
   }
 

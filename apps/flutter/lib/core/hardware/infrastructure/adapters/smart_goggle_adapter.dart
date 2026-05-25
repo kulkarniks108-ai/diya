@@ -20,23 +20,13 @@ class _SmartGoggleCameraCapability implements CameraCapability {
   Type get type => CameraCapability;
 
   bool _isSupportedImageBytes(Uint8List bytes) {
-    final isJpeg = bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
-    final isPng = bytes.length >= 8 &&
-        bytes[0] == 0x89 &&
-        bytes[1] == 0x50 &&
-        bytes[2] == 0x4E &&
-        bytes[3] == 0x47 &&
-        bytes[4] == 0x0D &&
-        bytes[5] == 0x0A &&
-        bytes[6] == 0x1A &&
-        bytes[7] == 0x0A;
-    return isJpeg || isPng;
+    return bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
   }
 
   @override
   Future<Uint8List?> capture() async {
     try {
-      final bytes = await _transport.requestBytes('POST', '/capture');
+      final bytes = await _transport.requestBytes('GET', '/capture');
       if (_isSupportedImageBytes(bytes)) {
         return bytes;
       }

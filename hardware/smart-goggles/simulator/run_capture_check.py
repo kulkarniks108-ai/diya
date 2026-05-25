@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
-resp = client.post('/capture')
+resp = client.get('/capture')
 print('status:', resp.status_code)
 print('content-type:', resp.headers.get('content-type'))
 data = resp.content

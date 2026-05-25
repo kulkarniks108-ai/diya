@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../domain/transports/device_transport.dart';
 
 class HttpTransportImpl implements DeviceTransport {
@@ -122,14 +123,22 @@ class HttpTransportImpl implements DeviceTransport {
         ? await _dio.get('http://$_connectedIp$normalizedPath', options: options)
         : await _dio.post('http://$_connectedIp$normalizedPath', data: body, options: options);
 
+    final contentType = response.headers.value('content-type') ?? '';
+    final status = response.statusCode ?? 0;
+    final raw = response.data;
+    final rawLength = raw is List<int>
+        ? raw.length
+        : (raw is Uint8List ? raw.length : raw?.toString().length ?? 0);
+    debugPrint(
+      'transport.bytes: $method $normalizedPath status=$status content-type=$contentType len=$rawLength',
+    );
+
     if (response.statusCode != 200 || response.data == null) {
       throw Exception('Unexpected response from $normalizedPath: ${response.statusCode}');
     }
 
     // Ensure the server returned an image-like content-type. If not, try to
     // decode payload as UTF8 and include it in the exception to help debugging.
-    final contentType = response.headers.value('content-type') ?? '';
-    final raw = response.data;
     if (!contentType.toLowerCase().startsWith('image/')) {
       // If the server returned JSON or text, return a helpful error with body
       try {

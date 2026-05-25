@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator, Dict
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -26,18 +26,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 state = SimulatorState()
 logs = LogBuffer()
 
-TINY_PNG_DATA_URL = (
-    "data:image/png;base64,"
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQI12P4//8/AwAI/AL+XzF+6QAAAABJRU5ErkJggg=="
-)
-
 # A minimal 1x1 JPEG used for simulator binary capture responses. Kept small for tests.
 TINY_JPEG_BASE64 = (
-    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAPDw8PDw8PDw8PDw8PDw8PDw8PFREWFhURFRUYHSggGBolGxUVITEhJSkrLi4uFx8zODMtNygtLisBCgoKDg0OGxAQGy0lICUtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAJ8BPgMBIgACEQEDEQH/xAAcAAEAAgMBAQEAAAAAAAAAAAAABAUCAwYBBwj/xABEEAACAQIDBAYFBQcCBwAAAAAAAQIDEQQSIQUGMUFREyJhcYGRBxQjkaGx0SNS4SNCUmLwJDNzssI1coOj/8QAGQEBAAMBAQAAAAAAAAAAAAAAAAEDBAIF/8QAJhEBAAICAQMDBQEAAAAAAAAAAAECAxESITFBEyJBYaEyQnGh/9oADAMBAAIRAxEAPwD3wREQEREBERAEREBERAEREBERAEREBERAEREBERAEREH/2Q=="
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/"
+    "2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/"
+    "wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKB"
+    "kaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ip"
+    "qrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcF"
+    "BAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3"
+    "eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7LooooA//2Q=="
 )
 
 TINY_JPEG_BYTES = base64.b64decode(TINY_JPEG_BASE64)
-TINY_JPEG_DATA_URL = f"data:image/jpeg;base64,{TINY_JPEG_BASE64}"
 
 
 class CommandRequest(BaseModel):
@@ -91,6 +91,14 @@ def _log(event: str, **fields: object) -> None:
     }
     logger.info(event, extra={"event": event, **fields})
     logs.add(payload)
+
+
+def _jpeg_magic_ok(payload: bytes) -> bool:
+    return len(payload) >= 2 and payload[0:2] == b"\xff\xd8"
+
+
+def _request_id() -> str:
+    return f"sim-{int(time.time() * 1000)}"
 
 
 @app.get("/")
@@ -156,38 +164,39 @@ async def command(req: CommandRequest) -> JSONResponse:
     elif req.command == "disconnect":
         state.connected = False
     elif req.command == "capture":
-        _log("capture.requested")
-        # Return a JPEG data-url for compatibility with older clients that expect
-        # a JSON payload containing an image_data_url. The binary /capture
-        # endpoint serves the same bytes as raw JPEG.
-        return JSONResponse({
-            "status": "ok",
-            # Keep JSON payload compatible with older clients using data-url.
-            # Use PNG data-url to avoid malformed-JPEG issues on some Android devices.
-            "image_data_url": TINY_PNG_DATA_URL,
-            "captured_at": datetime.now(tz=timezone.utc).isoformat(),
-            "device_id": state.device_id,
-        })
+        _log("capture.command_rejected")
+        raise HTTPException(status_code=400, detail="Use GET /capture for JPEG snapshot")
 
 
-@app.post('/capture')
-async def capture_raw() -> Response:
-    """Return a raw PNG bytes payload for compatibility with Android image decoders.
-
-    Some Android devices have strict JPEG decoders; serving a small PNG avoids
-    libjpeg issues and is acceptable for simulator/testing purposes.
-    """
-    # Decode the existing tiny PNG data-url into bytes so simulator uses the
-    # same canonical bytes in both JSON and binary endpoints.
-    png_base64 = TINY_PNG_DATA_URL.split(',', 1)[1]
-    payload = base64.b64decode(png_base64)
-    _log("capture.raw.requested", size=len(payload))
-    if payload[:8] != b"\x89PNG\r\n\x1a\n":
-        _log("capture.raw.invalid", size=len(payload), hex_prefix=payload[:8].hex())
-        raise HTTPException(status_code=500, detail="Invalid PNG payload configured in simulator")
-    hex_prefix = payload[:8].hex()
-    logger.info("capture.raw.respond", extra={"size": len(payload), "hex_prefix": hex_prefix})
-    return Response(content=payload, media_type="image/png")
+@app.api_route('/capture', methods=["GET", "POST"])
+async def capture_raw(request: Request) -> Response:
+    """Return a raw JPEG bytes payload for snapshot capture."""
+    req_id = _request_id()
+    payload = TINY_JPEG_BYTES
+    client_host = request.client.host if request.client else "unknown"
+    _log(
+        "capture.raw.requested",
+        request_id=req_id,
+        client=client_host,
+        method=request.method,
+        size=len(payload),
+    )
+    if not _jpeg_magic_ok(payload):
+        _log("capture.raw.invalid", request_id=req_id, size=len(payload), hex_prefix=payload[:8].hex())
+        raise HTTPException(status_code=500, detail="Invalid JPEG payload configured in simulator")
+    hex_prefix = payload[:16].hex()
+    logger.info(
+        "capture.raw.respond",
+        extra={"request_id": req_id, "size": len(payload), "hex_prefix": hex_prefix, "client": client_host},
+    )
+    headers = {
+        "Cache-Control": "no-store",
+        "Content-Length": str(len(payload)),
+        "X-Image-Format": "jpeg",
+        "X-Image-Bytes": str(len(payload)),
+        "X-Request-Id": req_id,
+    }
+    return Response(content=payload, media_type="image/jpeg", headers=headers)
 
 
 @app.post("/register-phone")
