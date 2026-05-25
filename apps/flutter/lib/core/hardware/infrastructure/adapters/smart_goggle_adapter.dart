@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
+import '../../domain/capabilities/device_capability.dart';
+import '../../domain/messaging/event_bus.dart';
 import '../../domain/models/base_device.dart';
 import '../../domain/models/connection_state.dart';
 import '../../domain/models/hardware_event.dart';
-import '../../domain/capabilities/device_capability.dart';
 import '../../domain/transports/device_transport.dart';
-import '../../domain/messaging/event_bus.dart';
 
 class _SmartGoggleCameraCapability implements CameraCapability {
   final DeviceTransport _transport;
@@ -19,96 +19,48 @@ class _SmartGoggleCameraCapability implements CameraCapability {
   @override
   Type get type => CameraCapability;
 
+  bool _isSupportedImageBytes(Uint8List bytes) {
+    final isJpeg = bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
+    final isPng = bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47 &&
+        bytes[4] == 0x0D &&
+        bytes[5] == 0x0A &&
+        bytes[6] == 0x1A &&
+        bytes[7] == 0x0A;
+    return isJpeg || isPng;
+  }
+
   @override
   Future<Uint8List?> capture() async {
     try {
-      // Primary: request raw bytes from /capture (binary JPEG)
-      try {
-        final bytes = await _transport.requestBytes('POST', '/capture');
-        // Basic validation: JPEG should begin with 0xFF 0xD8
-        if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
-          return bytes;
-        }
-          // If bytes are not valid JPEG, persist diagnostics and fallthrough to JSON fallback
-          try {
-            final tmp = Directory.systemTemp;
-            final file = File('${tmp.path}/capture_${_deviceId}_${DateTime.now().microsecondsSinceEpoch}.bin');
-            await file.writeAsBytes(bytes, flush: true);
-            _eventBus.publish(HardwareErrorEvent(
-              deviceId: _deviceId,
-              errorCode: 'capture_bad_image',
-              message: 'Capture returned invalid JPEG; wrote diagnostics to ${file.path}',
-              priority: 1,
-              trusted: true,
-            ));
-          } catch (_) {
-            // ignore failures in diagnostic write
-          }
-      } catch (_) {
-        // Ignore here; we'll attempt JSON fallback below and emit an error if both fail.
+      final bytes = await _transport.requestBytes('POST', '/capture');
+      if (_isSupportedImageBytes(bytes)) {
+        return bytes;
       }
 
-      // Fallback: older devices return a JSON payload with data-url encoded image
-      final response = await _transport.requestJson(
-        'POST',
-        '/command',
-        body: {'command': 'capture'},
-      );
-      final imageDataUrl = response['image_data_url'] as String?;
-      String? encoded;
-      if (imageDataUrl != null && imageDataUrl.isNotEmpty) {
-        final comma = imageDataUrl.indexOf(',');
-        encoded = comma >= 0 ? imageDataUrl.substring(comma + 1) : imageDataUrl;
-      }
-
-      // Backward compatibility: older simulator wraps payload in "received".
-      if (encoded == null || encoded.isEmpty) {
-        final received = response['received'];
-        if (received is Map<String, dynamic>) {
-          final nested = received['image_data_url'] as String?;
-          if (nested != null && nested.isNotEmpty) {
-            final comma = nested.indexOf(',');
-            encoded = comma >= 0 ? nested.substring(comma + 1) : nested;
-          }
-        }
-      }
-
-      if (encoded != null && encoded.isNotEmpty) {
-        try {
-          final bytes = base64Decode(encoded);
-          if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
-            return bytes;
-          }
-          // attempt to persist diagnostics
-          try {
-            final tmp = Directory.systemTemp;
-            final file = File('${tmp.path}/capture_bad_${_deviceId}_${DateTime.now().microsecondsSinceEpoch}.bin');
-            await file.writeAsBytes(bytes, flush: true);
-            _eventBus.publish(HardwareErrorEvent(
-              deviceId: _deviceId,
-              errorCode: 'capture_bad_image',
-              message: 'Capture returned invalid JPEG; diagnostics: ${file.path}',
-              priority: 1,
-              trusted: true,
-            ));
-            throw Exception('capture_failed: invalid image saved to ${file.path}');
-          } catch (_) {
-            throw Exception('capture_failed: invalid image received and diagnostics write failed');
-          }
-        } catch (e) {
-          // decode failed or other error
-          throw Exception('capture_failed: ${e}');
-        }
+      final diagPath = await _writeDiagnostic(bytes, 'capture');
+      if (diagPath != null) {
+        _eventBus.publish(HardwareErrorEvent(
+          deviceId: _deviceId,
+          errorCode: 'capture_bad_image',
+          message: 'Capture returned invalid image; wrote diagnostics to $diagPath',
+          priority: 1,
+          trusted: true,
+        ));
+        throw Exception('capture_failed: invalid image saved to $diagPath');
       }
 
       _eventBus.publish(HardwareErrorEvent(
         deviceId: _deviceId,
-        errorCode: 'capture_empty',
-        message: 'Capture command returned no valid image payload',
-        priority: 2,
+        errorCode: 'capture_bad_image',
+        message: 'Capture returned invalid image and diagnostics write failed',
+        priority: 1,
         trusted: true,
       ));
-      throw Exception('capture_failed: no valid payload returned');
+      throw Exception('capture_failed: invalid image received and diagnostics write failed');
     } catch (e) {
       _eventBus.publish(HardwareErrorEvent(
         deviceId: _deviceId,
@@ -119,6 +71,36 @@ class _SmartGoggleCameraCapability implements CameraCapability {
       ));
       throw Exception('capture_failed: $e');
     }
+  }
+
+  Future<String?> _writeDiagnostic(Uint8List bytes, String prefix) async {
+    final candidates = <String>[];
+    try {
+      candidates.add(Directory.systemTemp.path);
+    } catch (_) {}
+    candidates.addAll([
+      '/sdcard/Download',
+      '/storage/emulated/0/Download',
+    ]);
+
+    for (final base in candidates) {
+      try {
+        final dir = Directory(base);
+        if (!await dir.exists()) {
+          try {
+            await dir.create(recursive: true);
+          } catch (_) {
+            continue;
+          }
+        }
+        final file = File('${dir.path}/${prefix}_${_deviceId}_${DateTime.now().microsecondsSinceEpoch}.bin');
+        await file.writeAsBytes(bytes, flush: true);
+        return file.path;
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
   }
 }
 
@@ -164,7 +146,7 @@ class SmartGoggleAdapter implements BaseDevice {
   final String _id;
   final DeviceTransport _transport;
   final HardwareEventBus _eventBus;
-  
+
   HardwareConnectionState _state = HardwareConnectionState.idle;
   late final List<DeviceCapability> _capabilities;
 

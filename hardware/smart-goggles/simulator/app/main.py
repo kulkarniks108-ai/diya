@@ -162,7 +162,9 @@ async def command(req: CommandRequest) -> JSONResponse:
         # endpoint serves the same bytes as raw JPEG.
         return JSONResponse({
             "status": "ok",
-            "image_data_url": TINY_JPEG_DATA_URL,
+            # Keep JSON payload compatible with older clients using data-url.
+            # Use PNG data-url to avoid malformed-JPEG issues on some Android devices.
+            "image_data_url": TINY_PNG_DATA_URL,
             "captured_at": datetime.now(tz=timezone.utc).isoformat(),
             "device_id": state.device_id,
         })
@@ -170,20 +172,22 @@ async def command(req: CommandRequest) -> JSONResponse:
 
 @app.post('/capture')
 async def capture_raw() -> Response:
-    """Return a raw JPEG bytes payload. This models how an ESP32 camera would return a binary JPEG.
+    """Return a raw PNG bytes payload for compatibility with Android image decoders.
 
-    The endpoint intentionally returns a small JPEG for development and testing. The response
-    includes basic logging: content-length and a hex prefix of the first bytes.
+    Some Android devices have strict JPEG decoders; serving a small PNG avoids
+    libjpeg issues and is acceptable for simulator/testing purposes.
     """
-    payload = TINY_JPEG_BYTES
+    # Decode the existing tiny PNG data-url into bytes so simulator uses the
+    # same canonical bytes in both JSON and binary endpoints.
+    png_base64 = TINY_PNG_DATA_URL.split(',', 1)[1]
+    payload = base64.b64decode(png_base64)
     _log("capture.raw.requested", size=len(payload))
-    # Log a short hex prefix for quick diagnostics (first 8 bytes)
+    if payload[:8] != b"\x89PNG\r\n\x1a\n":
+        _log("capture.raw.invalid", size=len(payload), hex_prefix=payload[:8].hex())
+        raise HTTPException(status_code=500, detail="Invalid PNG payload configured in simulator")
     hex_prefix = payload[:8].hex()
     logger.info("capture.raw.respond", extra={"size": len(payload), "hex_prefix": hex_prefix})
-    return Response(content=payload, media_type="image/jpeg")
-
-    _log("command.phone", **state.last_command)
-    return JSONResponse({"status": "ok", "received": state.last_command})
+    return Response(content=payload, media_type="image/png")
 
 
 @app.post("/register-phone")
@@ -225,9 +229,9 @@ async def _frame_stream() -> AsyncGenerator[bytes, None]:
             "event": "frame",
             "frame_id": frame_id,
             "ts": time.time(),
-            # Use JPEG data-url in frame stream as well so consumers see
-            # consistent image encoding.
-            "data_url": TINY_JPEG_DATA_URL,
+            # Use PNG data-url in frame stream to match binary /capture and
+            # avoid JPEG decoder incompatibilities on some Android devices.
+            "data_url": TINY_PNG_DATA_URL,
             "battery_level": state.battery_level,
         }
         yield f"data: {json.dumps(payload)}\n\n".encode("utf-8")

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -178,10 +179,12 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     setState(() {
       _isCapturing = true;
       _captureError = null;
+      _captureImageBytes = null;
     });
 
     try {
       Uint8List? bytes;
+      String? responseMeta;
       if (capability != null) {
         bytes = await capability.capture();
       } else {
@@ -193,6 +196,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
             if (resp.statusCode == 200 && resp.data is List<int>) {
               bytes = Uint8List.fromList(resp.data as List<int>);
             }
+            responseMeta = 'status=${resp.statusCode} content-type=${resp.headers.value('content-type') ?? 'unknown'}';
           }
         } catch (_) {
           // ignore and try JSON fallback
@@ -213,13 +217,20 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
       }
 
       try {
-        // This will throw if the image bytes cannot be decoded.
-        await ui.instantiateImageCodec(bytes);
+        // Decode a frame to ensure the bytes are actually renderable.
+        final codec = await ui.instantiateImageCodec(bytes);
+        try {
+          await codec.getNextFrame();
+        } finally {
+          codec.dispose();
+        }
         if (!mounted) return;
         setState(() {
           _captureImageBytes = bytes;
         });
       } catch (e) {
+        final hexPrefix = _hexPrefix(bytes, 24);
+        final asciiPrefix = _asciiPrefix(bytes, 64);
         // Persist diagnostic file to system temp for offline inspection.
         String diagPath = 'unknown';
         try {
@@ -232,13 +243,23 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
         }
 
         final msg = 'Invalid image data: ${e} (diagnostic: $diagPath)';
-        print(msg);
-        if (mounted) setState(() => _captureError = msg);
+        debugPrint('capture.decode.failed: $msg');
+        debugPrint('capture.decode.failed: len=${bytes.length} hex=${hexPrefix} ascii=${asciiPrefix}');
+        if (responseMeta != null) {
+          debugPrint('capture.decode.failed: response=${responseMeta}');
+        }
+        if (mounted) {
+          setState(() {
+            _captureError = msg;
+            _captureImageBytes = null;
+          });
+        }
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _captureError = '$e';
+        _captureImageBytes = null;
       });
     } finally {
       if (mounted) {
@@ -257,6 +278,29 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  String _hexPrefix(Uint8List bytes, int max) {
+    final len = bytes.length < max ? bytes.length : max;
+    final buffer = StringBuffer();
+    for (var i = 0; i < len; i++) {
+      buffer.write(bytes[i].toRadixString(16).padLeft(2, '0'));
+    }
+    return buffer.toString();
+  }
+
+  String _asciiPrefix(Uint8List bytes, int max) {
+    final len = bytes.length < max ? bytes.length : max;
+    final buffer = StringBuffer();
+    for (var i = 0; i < len; i++) {
+      final b = bytes[i];
+      if (b >= 32 && b <= 126) {
+        buffer.writeCharCode(b);
+      } else {
+        buffer.write('.');
+      }
+    }
+    return buffer.toString();
   }
 
   bool get _hasRecentReachability {
@@ -596,7 +640,19 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen> {
                       if (imageBytes != null) {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(imageBytes, fit: BoxFit.cover),
+                          child: Image.memory(
+                            imageBytes,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Text(
+                                  'Image decode failed: $error',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace'),
+                                ),
+                              );
+                            },
+                          ),
                         );
                       }
 
