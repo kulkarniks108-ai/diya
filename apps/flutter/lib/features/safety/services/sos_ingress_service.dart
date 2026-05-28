@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:uuid/uuid.dart';
-
 import '../../../core/hardware/domain/messaging/event_bus.dart';
 import '../../../core/hardware/domain/models/hardware_event.dart';
 import '../../../core/hardware/infrastructure/transports/device_discovery_server.dart';
@@ -36,14 +34,19 @@ class SosIngressService {
     final accessToken = _sessionController.state.session?.accessToken;
     final deviceId = (data['device_id'] as String?) ?? 'unknown-device';
     final sourceIp = data['source_ip'] as String?;
-    final idempotencyKey = data['idempotency_key'] as String?;
+    final rawIdempotencyKey = data['idempotency_key'] as String?;
 
     final payload = _buildPayload(data, sourceIp);
+    final idempotencyKey = _ensureIdempotencyKey(
+      deviceId: deviceId,
+      payload: payload,
+      providedKey: rawIdempotencyKey,
+    );
 
     if (accessToken == null || accessToken.isEmpty) {
       await _safetyService.enqueueSos(
         payload: payload,
-        idempotencyKey: idempotencyKey ?? const Uuid().v4(),
+        idempotencyKey: idempotencyKey,
       );
       _eventBus.publish(HardwareErrorEvent(
         deviceId: deviceId,
@@ -84,5 +87,20 @@ class SosIngressService {
     };
 
     return payload;
+  }
+
+  String _ensureIdempotencyKey({
+    required String deviceId,
+    required Map<String, dynamic> payload,
+    required String? providedKey,
+  }) {
+    final trimmed = providedKey?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      return trimmed;
+    }
+
+    final timestamp = payload['timestamp'] as String? ?? DateTime.now().toIso8601String();
+    final location = payload['location'] as String? ?? 'unknown-location';
+    return 'sos-$deviceId-$timestamp-$location';
   }
 }
