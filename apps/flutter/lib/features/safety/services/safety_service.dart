@@ -31,15 +31,29 @@ class SafetyService {
       'location': location,
       'timestamp': DateTime.now().toIso8601String(),
     };
-    // Generate idempotency key ONCE at the point of intent
-    final idempotencyKey = const Uuid().v4();
+    return triggerSosEvent(
+      accessToken: accessToken,
+      payload: payload,
+    );
+  }
+
+  Future<SafetyState> triggerSosEvent({
+    required String accessToken,
+    required Map<String, dynamic> payload,
+    String? idempotencyKey,
+  }) async {
+    var state = SafetyState(status: SafetyStatus.idle).toTriggered(DateTime.now());
+    state = state.toSending();
+
+    // Generate idempotency key ONCE at the point of intent.
+    final effectiveKey = idempotencyKey ?? const Uuid().v4();
 
     try {
       final response = await _api.createSafetyEvent(
         accessToken: accessToken,
         type: 'SOS',
         payload: payload,
-        idempotencyKey: idempotencyKey,
+        idempotencyKey: effectiveKey,
       );
 
       return state.toSent(response.traceId);
@@ -48,19 +62,28 @@ class SafetyService {
       final failedState = state.toFailed(appError);
 
       if (appError.retryable) {
-        // Persist the SAME idempotency key for retries
-        final queueItem = QueueItem(
-          id: const Uuid().v4(),
-          type: QueueItemType.sos,
+        await enqueueSos(
           payload: payload,
-          createdAt: DateTime.now(),
-          idempotencyKey: idempotencyKey, // Reusing the same key
+          idempotencyKey: effectiveKey,
         );
-        await _queueRepository.enqueue(queueItem);
       }
 
       return failedState;
     }
+  }
+
+  Future<void> enqueueSos({
+    required Map<String, dynamic> payload,
+    String? idempotencyKey,
+  }) async {
+    final queueItem = QueueItem(
+      id: const Uuid().v4(),
+      type: QueueItemType.sos,
+      payload: payload,
+      createdAt: DateTime.now(),
+      idempotencyKey: idempotencyKey,
+    );
+    await _queueRepository.enqueue(queueItem);
   }
 
   Future<SafetyState> retryQueuedSOS({

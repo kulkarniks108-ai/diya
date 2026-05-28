@@ -9,6 +9,9 @@ import '../../../core/queue/queue_repository.dart';
 import '../../../core/utils/async_lock.dart';
 import '../models/safety_state.dart';
 import '../services/safety_service.dart';
+import '../services/sos_ingress_service.dart';
+import '../../../core/hardware/providers/hardware_providers.dart';
+import '../../../core/session/session_controller.dart';
 
 // Providers
 final safetyApiProvider = Provider<SafetyApi>((ref) => SafetyApi());
@@ -24,6 +27,23 @@ final safetyServiceProvider = Provider<SafetyService>((ref) {
     safetyApi: ref.read(safetyApiProvider),
     queueRepository: ref.read(queueRepositoryProvider),
   );
+});
+
+final sosIngressServiceProvider = Provider<SosIngressService>((ref) {
+  final server = ref.read(deviceDiscoveryServerProvider);
+  final safetyService = ref.read(safetyServiceProvider);
+  final safetyController = ref.read(safetyControllerProvider);
+  final sessionController = ref.read(sessionControllerProvider);
+  final eventBus = ref.read(hardwareEventBusProvider);
+  final service = SosIngressService(
+    server,
+    safetyService,
+    safetyController,
+    sessionController,
+    eventBus,
+  );
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 final safetyControllerProvider = ChangeNotifierProvider<SafetyController>((ref) {
@@ -79,6 +99,33 @@ class SafetyController extends ChangeNotifier {
 
     _state = newState;
     notifyListeners();
+  }
+
+  /// Handle an SOS event triggered by a device (no permission gate).
+  /// Returns the final state so callers can inspect failure conditions.
+  Future<SafetyState> handleDeviceSos({
+    required String accessToken,
+    required Map<String, dynamic> payload,
+    String? idempotencyKey,
+  }) async {
+    final location = payload['location'] as String?;
+    _state = SafetyState(status: SafetyStatus.idle)
+        .toTriggered(DateTime.now())
+        .copyWith(location: location)
+        .toSending();
+    notifyListeners();
+
+    final newState = await _safetyService.triggerSosEvent(
+      accessToken: accessToken,
+      payload: payload,
+      idempotencyKey: idempotencyKey,
+    );
+
+    _state = location != null && newState.location == null
+        ? newState.copyWith(location: location)
+        : newState;
+    notifyListeners();
+    return _state;
   }
 
   /// Retry a failed SOS action (from queue).

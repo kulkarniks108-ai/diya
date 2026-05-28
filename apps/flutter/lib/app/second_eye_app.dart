@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app_router.dart';
 
 import 'package:diya_flutter/features/debug/widgets/secret_debug_trigger.dart';
+import 'package:diya_flutter/features/safety/providers/safety_controller.dart';
 
 class SecondEyeApp extends ConsumerWidget {
   const SecondEyeApp({super.key});
@@ -11,6 +12,7 @@ class SecondEyeApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    ref.read(sosIngressServiceProvider);
 
     return MaterialApp.router(
       title: '2ndEye',
