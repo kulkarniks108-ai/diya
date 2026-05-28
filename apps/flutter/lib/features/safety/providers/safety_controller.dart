@@ -9,6 +9,9 @@ import '../../../core/queue/queue_repository.dart';
 import '../../../core/utils/async_lock.dart';
 import '../models/safety_state.dart';
 import '../services/safety_service.dart';
+import '../services/sos_ingress_service.dart';
+import '../../../core/hardware/providers/hardware_providers.dart';
+import '../../../core/session/session_controller.dart';
 
 // Providers
 final safetyApiProvider = Provider<SafetyApi>((ref) => SafetyApi());
@@ -24,6 +27,16 @@ final safetyServiceProvider = Provider<SafetyService>((ref) {
     safetyApi: ref.read(safetyApiProvider),
     queueRepository: ref.read(queueRepositoryProvider),
   );
+});
+
+final sosIngressServiceProvider = Provider<SosIngressService>((ref) {
+  final server = ref.read(deviceDiscoveryServerProvider);
+  final safetyService = ref.read(safetyServiceProvider);
+  final sessionController = ref.read(sessionControllerProvider);
+  final eventBus = ref.read(hardwareEventBusProvider);
+  final service = SosIngressService(server, safetyService, sessionController, eventBus);
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 final safetyControllerProvider = ChangeNotifierProvider<SafetyController>((ref) {
