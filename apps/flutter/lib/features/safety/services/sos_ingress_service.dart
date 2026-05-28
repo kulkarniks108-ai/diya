@@ -7,12 +7,14 @@ import '../../../core/hardware/domain/models/hardware_event.dart';
 import '../../../core/hardware/infrastructure/transports/device_discovery_server.dart';
 import '../../../core/session/session_controller.dart';
 import '../services/safety_service.dart';
+import '../providers/safety_controller.dart';
 import '../models/safety_state.dart';
 
 class SosIngressService {
   SosIngressService(
     this._server,
     this._safetyService,
+    this._safetyController,
     this._sessionController,
     this._eventBus,
   ) {
@@ -21,6 +23,7 @@ class SosIngressService {
 
   final DeviceDiscoveryServer _server;
   final SafetyService _safetyService;
+  final SafetyController _safetyController;
   final SessionController _sessionController;
   final HardwareEventBus _eventBus;
   StreamSubscription<Map<String, dynamic>>? _subscription;
@@ -52,7 +55,7 @@ class SosIngressService {
       return;
     }
 
-    final state = await _safetyService.triggerSosEvent(
+    final state = await _safetyController.handleDeviceSos(
       accessToken: accessToken,
       payload: payload,
       idempotencyKey: idempotencyKey,
