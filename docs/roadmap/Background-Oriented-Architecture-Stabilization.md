@@ -1,4 +1,4 @@
-# Background-Oriented-Architecture-Stabilization
+# Background-Oriented Architecture Stabilization Roadmap
 
 This roadmap is intentionally loose. It defines themes and goals to prepare the codebase for foreground/background services without prescribing strict sequencing.
 
