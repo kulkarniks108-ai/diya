@@ -19,3 +19,4 @@ Then open:
 - The simulator emits SSE streams for frames and telemetry.
 - Logging is structured and shown in the UI log pane.
 - `/capture` returns a live webcam JPEG snapshot on each request. Use `?camera_index=1` to pick a different camera (default 0).
+- `/sos` triggers a device SOS and forwards it to the phone server (requires /register-phone first).

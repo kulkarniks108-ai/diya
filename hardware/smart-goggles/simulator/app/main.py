@@ -54,6 +54,11 @@ class RegisterPhoneRequest(BaseModel):
     device_id: str | None = None
 
 
+class SosRequest(BaseModel):
+    location: str | None = None
+    idempotency_key: str | None = None
+
+
 async def _notify_ultrasonic_event(distance_cm: float, detected: bool) -> None:
     if not state.phone_ip:
         return
@@ -73,6 +78,21 @@ async def _notify_ultrasonic_event(distance_cm: float, detected: bool) -> None:
         _log("ultrasonic.notify.phone", distance_cm=distance_cm, detected=detected)
     except Exception as exc:  # noqa: BLE001
         _log("ultrasonic.notify.phone.failed", error=str(exc), distance_cm=distance_cm)
+
+
+async def _notify_sos_event(payload: dict) -> None:
+    if not state.phone_ip:
+        raise HTTPException(status_code=400, detail="Phone is not registered yet")
+
+    url = f"http://{state.phone_ip}:{state.phone_port}/sos"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+        _log("sos.notify.phone", payload=payload)
+    except Exception as exc:  # noqa: BLE001
+        _log("sos.notify.phone.failed", error=str(exc), payload=payload)
+        raise HTTPException(status_code=502, detail={"message": str(exc)}) from exc
 
 
 def _log(event: str, **fields: object) -> None:
@@ -253,6 +273,23 @@ async def register_with_phone(req: RegisterPhoneRequest) -> JSONResponse:
     except Exception as exc:  # noqa: BLE001
         _log("register.phone.failed", phone_ip=phone_ip, port=req.port, error=str(exc))
         raise HTTPException(status_code=502, detail={"message": str(exc)}) from exc
+
+
+@app.post("/sos")
+async def trigger_sos(req: SosRequest) -> JSONResponse:
+    payload = {
+        "device_id": state.device_id,
+        "device_type": "goggle",
+        "payload": {
+            "location": req.location,
+            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        },
+    }
+    if req.idempotency_key:
+        payload["idempotency_key"] = req.idempotency_key
+
+    await _notify_sos_event(payload)
+    return JSONResponse({"status": "ok", "forwarded": True})
 
 
 @app.get("/logs")
