@@ -49,8 +49,8 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: infra/docker/api.Dockerfile
+      context: ./backend/api
+      dockerfile: ../../infra/docker/api.Dockerfile
     container_name: diya-api
     restart: always
     env_file:
@@ -72,8 +72,8 @@ services:
 
   simulator-goggle:
     build:
-      context: .
-      dockerfile: infra/docker/simulator.Dockerfile
+      context: ./hardware/smart-goggles/simulator
+      dockerfile: ../../../infra/docker/simulator.Dockerfile
     container_name: diya-simulator
     restart: always
     ports:
