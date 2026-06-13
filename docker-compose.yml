@@ -1,4 +1,3 @@
-version: '3.8'
 
 networks:
   diya_network:
@@ -68,7 +67,7 @@ services:
       db:
         condition: service_healthy
     command: >-
-      sh -c "uv run alembic upgrade head && uv run fastapi run app/main.py --host 0.0.0.0 --port 8000 --reload"
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   simulator-goggle:
     build:
@@ -82,4 +81,4 @@ services:
       - ./hardware/smart-goggles/simulator:/app
     networks:
       - diya_network
-    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]

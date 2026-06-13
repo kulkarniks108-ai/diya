@@ -5,6 +5,7 @@ WORKDIR /app
 # Enable bytecode compilation and copy environment path
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 
 # Copy package management files
 COPY pyproject.toml uv.lock ./
@@ -19,10 +20,10 @@ FROM python:3.13-slim-bookworm AS runner
 WORKDIR /app
 
 # Copy the virtual environment from the builder stage
-COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /opt/venv /opt/venv
 
 # Ensure the virtual environment is on the PATH
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy the application code
 COPY . /app/
@@ -31,4 +32,4 @@ COPY . /app/
 EXPOSE 8000
 
 # Run the application (command overridden in docker-compose for hot reload)
-CMD ["uv", "run", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
