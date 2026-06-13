@@ -4,5 +4,5 @@ $ProjectRoot = Resolve-Path "$PSScriptRoot\..\.."
 Set-Location $ProjectRoot
 
 Write-Host "Running Alembic migrations..." -ForegroundColor Cyan
-docker compose exec api uv run alembic upgrade head
+docker compose exec api alembic upgrade head
 Write-Host "✅ Migrations complete." -ForegroundColor Green

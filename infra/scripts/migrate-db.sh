@@ -4,5 +4,5 @@
 cd "$(dirname "$0")/../.."
 
 echo "Running Alembic migrations..."
-docker compose exec api uv run alembic upgrade head
+docker compose exec api alembic upgrade head
 echo "✅ Migrations complete."
