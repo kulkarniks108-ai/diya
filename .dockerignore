@@ -1,0 +1,51 @@
+# Ignore python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Ignore build artifacts
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ignore node modules
+node_modules/
+.next/
+out/
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore local env files (never copy secrets)
+.env
+.env.local
+.env.*.local
+
+# Ignore IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# DO NOT ignore hardware directories (per user request)
